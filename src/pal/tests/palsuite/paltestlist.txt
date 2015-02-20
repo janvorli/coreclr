@@ -90,6 +90,7 @@ c_runtime/iswupper/test1/paltest_iswupper_test1
 c_runtime/iswxdigit/test1/paltest_iswxdigit_test1
 c_runtime/isxdigit/test1/paltest_isxdigit_test1
 c_runtime/labs/test1/paltest_labs_test1
+c_runtime/llabs/test1/paltest_llabs_test1
 c_runtime/localtime/test1/paltest_localtime_test1
 c_runtime/log/test1/paltest_log_test1
 c_runtime/log10/test1/paltest_log10_test1
@@ -159,6 +160,7 @@ c_runtime/sscanf/test15/paltest_sscanf_test15
 c_runtime/sscanf/test16/paltest_sscanf_test16
 c_runtime/sscanf/test17/paltest_sscanf_test17
 c_runtime/sscanf/test2/paltest_sscanf_test2
+c_runtime/sscanf/test3/paltest_sscanf_test3
 c_runtime/sscanf/test4/paltest_sscanf_test4
 c_runtime/sscanf/test5/paltest_sscanf_test5
 c_runtime/sscanf/test6/paltest_sscanf_test6
@@ -436,6 +438,9 @@ c_runtime/_wsplitpath/test1/paltest_wsplitpath_test1
 c_runtime/_wtoi/test1/paltest_wtoi_test1
 c_runtime/__iscsym/test1/paltest_iscsym_test1
 debug_api/OutputDebugStringW/test1/paltest_outputdebugstringw_test1
+exception_handling/RaiseException/test1/paltest_raiseexception_test1
+exception_handling/RaiseException/test2/paltest_raiseexception_test2
+exception_handling/RaiseException/test3/paltest_raiseexception_test3
 filemapping_memmgt/CreateFileMappingA/test1/paltest_createfilemappinga_test1
 filemapping_memmgt/CreateFileMappingA/test3/paltest_createfilemappinga_test3
 filemapping_memmgt/CreateFileMappingA/test4/paltest_createfilemappinga_test4
@@ -551,6 +556,7 @@ file_io/GetFileAttributesA/test1/paltest_getfileattributesa_test1
 file_io/GetFileAttributesExW/test2/paltest_getfileattributesexw_test2
 file_io/GetFileAttributesW/test1/paltest_getfileattributesw_test1
 file_io/GetFileSize/test1/paltest_getfilesize_test1
+file_io/GetFileSizeEx/test1/paltest_getfilesizeex_test1
 file_io/GetFileTime/test1/paltest_getfiletime_test1
 file_io/GetFileTime/test2/paltest_getfiletime_test2
 file_io/GetFileTime/test3/paltest_getfiletime_test3

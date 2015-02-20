@@ -93,7 +93,7 @@ static PCRITICAL_SECTION init_critsec = NULL;
 char g_szCoreCLRPath[MAX_PATH] = { 0 };
 
 static BOOL INIT_IncreaseDescriptorLimit(void);
-static LPWSTR INIT_FormatCommandLine (CPalThread *pThread, int argc, const char **argv);
+static LPWSTR INIT_FormatCommandLine (CPalThread *pThread, int argc, const char * const *argv);
 static LPWSTR INIT_FindEXEPath(CPalThread *pThread, LPCSTR exe_name);
 
 #ifdef _DEBUG
@@ -135,7 +135,7 @@ int
 PALAPI
 PAL_Initialize(
             int argc,
-            const char *argv[])
+            const char *const argv[])
 {
     PAL_ERROR palError = ERROR_GEN_FAILURE;
     CPalThread *pThread = NULL;
@@ -192,22 +192,6 @@ PAL_Initialize(
         gPID = getpid();
 
         fFirstTimeInit = true;
-
-#if defined(__ppc__)
-        {
-            int mib[2];
-            size_t len;
-
-            /* Determine the processor's cache line size, for
-               FlushInstructionCache */
-            mib[0] = CTL_HW;
-            mib[1] = HW_CACHELINE;
-            len = sizeof(CacheLineSize);
-            if (sysctl(mib, 2, &CacheLineSize, &len, NULL, 0) == -1) {
-                goto done;
-            }
-        }
-#endif //__ppc__
 
         // Initialize the TLS lookaside cache
         if (FALSE == TLSInitialize())
@@ -483,15 +467,6 @@ PAL_Initialize(
             goto CLEANUP15;
         }
 
-#if HAVE_COREFOUNDATION && !ENABLE_DOWNLEVEL_FOR_NLS
-        /* Initialize the locale functions */
-        if (FALSE == LocaleInitialize())
-        {
-            ERROR( "Unable to initialize the locale subsystem!\n"); 
-                goto CLEANUP17;
-        }
-#endif // HAVE_COREFOUNDATION && !ENABLE_DOWNLEVEL_FOR_NLS
-
         TRACE("First-time PAL initialization complete.\n");
         init_count++;        
 
@@ -518,10 +493,6 @@ PAL_Initialize(
     }
     goto done;
 
-#if HAVE_COREFOUNDATION && !ENABLE_DOWNLEVEL_FOR_NLS
-    LocaleCleanup();
-CLEANUP17:
-#endif // HAVE_COREFOUNDATION && !ENABLE_DOWNLEVEL_FOR_NLS
     /* No cleanup required for CRTInitStdStreams */ 
 CLEANUP15:
     FILECleanupStdHandles();
@@ -844,10 +815,6 @@ PALCommonCleanup(PALCLEANUP_STEP step, BOOL full_cleanup)
                 MiscCleanup();
                 TIMECleanUpTransitionDates();
 
-#if HAVE_COREFOUNDATION && !ENABLE_DOWNLEVEL_FOR_NLS
-                LocaleCleanup();
-#endif // HAVE_COREFOUNDATION && !ENABLE_DOWNLEVEL_FOR_NLS
-
 #if !HAVE_COREFOUNDATION
                 CODEPAGECleanup();
 #endif // !HAVE_COREFOUNDATION
@@ -1103,7 +1070,7 @@ Note : not all peculiarities of Windows command-line processing are supported;
      passed to argv as \\a... there may be other similar cases
     -there may be other characters which must be escaped 
 --*/
-static LPWSTR INIT_FormatCommandLine (CPalThread *pThread, int argc, const char **argv)
+static LPWSTR INIT_FormatCommandLine (CPalThread *pThread, int argc, const char * const *argv)
 {
     LPWSTR retval;
     LPSTR command_line=NULL, command_ptr;

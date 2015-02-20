@@ -1300,7 +1300,7 @@ static void LoadAndInitializeJIT(LPCWSTR pwzJitName, OUT HINSTANCE* phJit, OUT I
     extern HINSTANCE g_hThisInst;
     if (WszGetModuleFileName(g_hThisInst, CoreClrFolder, MAX_PATH))
     {
-        WCHAR *filePtr = wcsrchr(CoreClrFolder, W('\\'));
+        WCHAR *filePtr = wcsrchr(CoreClrFolder, DIRECTORY_SEPARATOR_CHAR_W);
         if (filePtr)
         {
             filePtr[1] = W('\0');
@@ -2186,7 +2186,7 @@ CodeHeader* EEJitManager::allocCode(MethodDesc* pMD, size_t blockSize, CorJitAll
         alignment = max(alignment, 16);
     }
     
-#if !defined(_WIN64) && !defined(_TARGET_ARM_)
+#if defined(_TARGET_X86_)
     // when not optimizing for code size, 8-byte align the method entry point, so that
     // the JIT can in turn 8-byte align the loop entry headers.
     // 
