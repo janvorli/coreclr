@@ -156,6 +156,11 @@ C_FUNC(\Name\()_End):
         .cfi_adjust_cfa_offset 8
 .endm
 
+.macro push_eflags
+        pushfq
+        .cfi_adjust_cfa_offset 8
+.endm
+
 .macro push_argument_register Reg
         push_register \Reg
 .endm
