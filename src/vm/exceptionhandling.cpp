@@ -3829,7 +3829,7 @@ ExceptionTracker* ExceptionTracker::GetOrCreateTracker(
                 // scanned stack range.
                 pTracker->m_sfFirstPassTopmostFrame = pTracker->m_ScannedStackRange.GetUpperBound();
 
-                // We have to detect this transition becuase otherwise we break when unmanaged code
+                // We have to detect this transition because otherwise we break when unmanaged code
                 // catches our exceptions.
                 EH_LOG((LL_INFO100, ">>tracker transitioned to second pass\n"));
                 if (!fIsInterleavedHandling)
@@ -4413,8 +4413,8 @@ VOID UnwindManagedExceptionPass2(EXCEPTION_RECORD* exceptionRecord, CONTEXT* unw
     } while (IsSpInStackLimits(currentFrameContext->Rsp, stackLowAddress, stackHighAddress) &&
         (establisherFrame != targetFrameSp));
 
-    printf("UnwindManagedExceptionPass2: Unwinding failed. Reached the end of the stack.\n");
-    UNREACHABLE();
+    _ASSERTE(!"UnwindManagedExceptionPass2: Unwinding failed. Reached the end of the stack");
+    EEPOLICY_HANDLE_FATAL_ERROR(COR_E_EXECUTIONENGINE);
 }
 
 //---------------------------------------------------------------------------------------
@@ -4541,6 +4541,11 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex)
             // Restore back the state of the first pass. We need to reread the current flags pointer
             // since if the exception tracker changed in the second pass, the pointer would be different.
             currentFlags = GetThread()->GetExceptionState()->GetFlags();
+
+            // Set back the UnwindHasStarted flag so that the ExceptionTracker::GetOrCreateTracker
+            // detects that there was a second pass and that it needs to recreate the tracker.
+            firstPassFlags.SetUnwindHasStarted();
+
             *currentFlags = firstPassFlags;
 
             // Pop the last managed frame so that when the native frames are unwound and
@@ -4564,8 +4569,8 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex)
 
     } while (IsSpInStackLimits(frameContext.Rsp, stackLowAddress, stackHighAddress));
 
-    printf("UnwindManagedExceptionPass1: Failed to find a handler. Reached the end of the stack.\n");
-    UNREACHABLE();
+    _ASSERTE(!"UnwindManagedExceptionPass1: Failed to find a handler. Reached the end of the stack");
+    EEPOLICY_HANDLE_FATAL_ERROR(COR_E_EXECUTIONENGINE);
 }
 
 VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex)

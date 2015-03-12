@@ -146,12 +146,12 @@ LEAF_ENTRY CONTEXT_CaptureContext, _TEXT
     mov     [rdi + CONTEXT_Dr7], rdx
 4:
     ret
-LEAF_END CONTEXT_CaptureContext
+LEAF_END CONTEXT_CaptureContext, _TEXT
 
 LEAF_ENTRY RtlCaptureContext, _TEXT
     mov     DWORD PTR [rdi + CONTEXT_ContextFlags], (CONTEXT_AMD64 | CONTEXT_FULL | CONTEXT_SEGMENTS)
     jmp     CONTEXT_CaptureContext
-LEAF_END RtlCaptureContext
+LEAF_END RtlCaptureContext, _TEXT
 
 #else
 
