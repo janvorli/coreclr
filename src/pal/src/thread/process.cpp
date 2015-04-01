@@ -40,6 +40,7 @@ Abstract:
 #endif  // HAVE_POLL
 
 #include <sys/types.h>
+#include <sched.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/time.h>
@@ -49,6 +50,7 @@ using namespace CorUnix;
 
 SET_DEFAULT_DEBUG_CHANNEL(THREAD);
 
+#define INJECT_ACTIVATION_SIGNAL SIGRTMIN
 
 void
 ProcessCleanupRoutine(
@@ -106,6 +108,11 @@ CRITICAL_SECTION g_csProcess;
 
 CPalThread* CorUnix::pGThreadList;
 DWORD g_dwThreadCount;
+
+//
+// Number of remaining threads to flush process write buffers
+//
+int cntThreadsToFlush = 0;
 
 //
 // The command line for the process
@@ -1744,6 +1751,33 @@ OpenProcessExit:
     return hProcess;
 }
 
+void FlushThreadWriteBuffers(CONST CONTEXT *context)
+{
+    InterlockedDecrement(&cntThreadsToFlush);    
+}
+
+void InjectActivationInternal(CorUnix::CPalThread* pThread, PAL_ActivationFunction activationFunction);
+
+// TODO: move the implementation to signal.cpp for Linux and some OSX specific place for OSX
+// TODO: How about using the InjectActivation after we implement it?
+// Hmm, no, the activation should work only when running in managed code
+// But maybe we can create a low level thing that both the activation and this would share.
+// Hmm, we should not attempt to modify the thread context on OSX if it is running in kernel.
+// Well, maybe we would never get kernel context and if a thread runs in the kernel, we would
+// get the user context on the boundary.
+void SignalThreadToFlush(CorUnix::CPalThread* pThread)
+{
+#ifndef __APPLE__
+    InjectActivationInternal(pThread, FlushThreadWriteBuffers);
+#else // __APPLE__
+    // UNIXTODO: Implement this
+
+    // Dummy implementation, just simulate that the thread has performed the flush
+    InterlockedDecrement(&cntThreadsToFlush);
+#endif // __APPLE__
+}
+
+
 /*++
 Function:
   FlushProcessWriteBuffers
@@ -1752,10 +1786,147 @@ See MSDN doc.
 --*/
 VOID 
 PALAPI 
+FlushProcessWriteBuffers2()
+{
+    PERF_ENTRY(FlushProcessWriteBuffers);
+    ENTRY("FlushProcessWriteBuffers()\n");
+
+    CorUnix::CPalThread* pThread;
+    CorUnix::CPalThread* pCurrentThread = InternalGetCurrentThread();
+
+    PROCProcessLock();
+
+    for (pThread = pGThreadList; pThread != NULL; pThread = pThread->GetNext())
+    {
+        // Skip the current thread and all non user threads
+        if (pThread != pCurrentThread && pThread->GetThreadType() == UserCreatedThread)
+        {
+            //printf("Signaling thread %p\n", pThread->GetThreadId());
+            InterlockedIncrement(&cntThreadsToFlush);
+            SignalThreadToFlush(pThread);
+        }
+        // else
+        // {
+        //     printf("Skipping thread %p\n", pThread->GetThreadId());
+        // }
+    }
+
+    // Wait until the signal is handled by all the threads
+    while (InterlockedCompareExchange(&cntThreadsToFlush, 0, 0) != 0)
+    {
+        sched_yield();
+    }
+
+    PROCProcessUnlock();
+
+    LOGEXIT("FlushProcessWriteBuffers\n");
+    PERF_EXIT(FlushProcessWriteBuffers);
+}
+
+
+// TODO: for OSX
+// thread_info provides info on the thread state (running or not))
+// http://stackoverflow.com/questions/13893134/get-current-pthread-cpu-usage-mac-os-x
+
+// TODO: how about freebsd?
+
+bool GetThreadStateAndCpu(CorUnix::CPalThread* pThread, int* cpu, bool* running)
+{
+    char ctlPath[MAX_PATH];
+    char buff[2048];
+
+    snprintf(ctlPath, sizeof(ctlPath), "/proc/self/task/%lu/stat", pThread->GetThreadId());
+    int fd = InternalOpen(InternalGetCurrentThread(), ctlPath, O_RDONLY);
+    if (fd == -1)
+    {
+        ERROR("Failed to open %s\n", ctlPath);
+        return false;
+    }
+
+    ssize_t len = read(fd, buff, sizeof(buff));
+    close(fd);
+
+    if (len == -1)
+    {
+        ERROR("Failed to open %s\n", ctlPath);
+        return false;        
+    }
+
+    buff[len] = '\0';
+
+    // // skip after the 
+    // while (*buff && *buff != ')')
+    // {
+    //     buff++;
+    // }
+
+    char state;
+    sscanf(buff, "%*d (%*[^)]) %c %*d %*d %*d %*d %*d %*u %*lu "
+                 "%*lu %*lu %*lu %*lu %*lu %*ld %*ld %*ld %*ld %*ld "
+                 "%*ld %*llu %*lu %*ld %*lu %*lu %*lu %*lu %*lu %*lu "
+                 "%*lu %*lu %*lu %*lu %*lu %*lu %*lu %*d %d %*u "
+                 "%*u %*llu %*lu %*ld %*lu %*lu %*lu %*lu %*lu %*lu "
+                 "%*lu %*d", &state, cpu);
+
+    *running = (state == 'R');
+
+    return true;
+}
+
+VOID 
+PALAPI 
 FlushProcessWriteBuffers()
 {
-    // UNIXTODO: Implement this. There seems to be no equivalent on Linux
-    // that could be used in user mode code.   
+    PERF_ENTRY(FlushProcessWriteBuffers);
+    ENTRY("FlushProcessWriteBuffers()\n");
+
+    printf("START FlushProcessWriteBuffers\n");
+
+    CorUnix::CPalThread* pThread;
+    CorUnix::CPalThread* pCurrentThread = InternalGetCurrentThread();
+
+    PROCProcessLock();
+
+    cpu_set_t cpuSet;
+    CPU_ZERO(&cpuSet);
+
+    for (pThread = pGThreadList; pThread != NULL; pThread = pThread->GetNext())
+    {
+        // Skip the current thread and all non user threads
+        if (pThread != pCurrentThread && pThread->GetThreadType() == UserCreatedThread)
+        {
+            int cpu;
+            bool running;
+            printf("We are running on cpu %d\n", sched_getcpu());
+            if (GetThreadStateAndCpu(pThread, &cpu, &running) && running)
+            {
+                if (/*!CPU_ISSET(cpu, &cpuSet) && */cpu != sched_getcpu())
+                {
+                    //CPU_SET(cpu, &cpuSet);
+                    printf("Signaling thread %ld on cpu %d\n", pThread->GetThreadId(), cpu);
+                    InterlockedIncrement(&cntThreadsToFlush);
+                    SignalThreadToFlush(pThread);
+                }
+                else
+                {
+                    printf("Ignoring thread %ld running on cpu %d\n", pThread->GetThreadId(), cpu);
+                }
+            }
+        }
+    }
+
+    // Wait until the signal is handled by all the threads
+    while (InterlockedCompareExchange(&cntThreadsToFlush, 0, 0) != 0)
+    {
+        sched_yield();
+    }
+
+    PROCProcessUnlock();
+
+    printf("END FlushProcessWriteBuffers\n");
+
+    LOGEXIT("FlushProcessWriteBuffers\n");
+    PERF_EXIT(FlushProcessWriteBuffers);
 }
 
 /*++

@@ -221,6 +221,8 @@ function_name() to call the system's implementation
    defined in pal.h  */
 #define PAL_RAND_MAX 0x7fff
 
+typedef void (*PAL_ActivationFunction)(CONST CONTEXT *context);
+
 /* The standard headers define isspace and isxdigit as macros and functions,
    To avoid redefinition problems, undefine those macros. */
 #ifdef isspace
