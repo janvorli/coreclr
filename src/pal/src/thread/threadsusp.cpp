@@ -1840,43 +1840,61 @@ CThreadSuspensionInfo::THREADHandleSuspendNative(CPalThread *pthrTarget)
     {
         pthrTarget->SetStartStatus(TRUE);
     }
-    
+
+    BOOL retry = FALSE;
+    do
+    {
 #if HAVE_PTHREAD_SUSPEND
-    dwPthreadRet = pthread_suspend(pthrTarget->GetPThreadSelf());
+        dwPthreadRet = pthread_suspend(pthrTarget->GetPThreadSelf());
 #elif HAVE_MACH_THREADS
-    dwPthreadRet = thread_suspend(pthread_mach_thread_np(pthrTarget->GetPThreadSelf()));
+        mach_port_t threadPort = pthread_mach_thread_np(pthrTarget->GetPThreadSelf());
+        dwPthreadRet = thread_suspend(threadPort);
 #elif HAVE_PTHREAD_SUSPEND_NP
 #if SELF_SUSPEND_FAILS_WITH_NATIVE_SUSPENSION
-    if (pthrTarget->suspensionInfo.GetSelfSusp())
-    {
-        pthrTarget->suspensionInfo.WaitOnSuspendSemaphore();   
-    }
-    else
+        if (pthrTarget->suspensionInfo.GetSelfSusp())
+        {
+            pthrTarget->suspensionInfo.WaitOnSuspendSemaphore();   
+        }
+        else
 #endif // SELF_SUSPEND_FAILS_WITH_NATIVE_SUSPENSION
-    {
-        dwPthreadRet = pthread_suspend_np(pthrTarget->GetPThreadSelf());
-    }
+        {
+            dwPthreadRet = pthread_suspend_np(pthrTarget->GetPThreadSelf());
+        }
 #else
-    #error "Don't know how to suspend threads on this platform!"
-    return FALSE;
+        #error "Don't know how to suspend threads on this platform!"
+        return FALSE;
 #endif
 
-    // A self suspending thread that reaches this point would have been resumed
-    // by a call to THREADHandleResumeNative. The self suspension has been 
-    // completed so it can set its selfsusp flag to FALSE. Reset the selfsusp flag 
-    // before checking the return value in case the suspend itself failed.
-    if (pthrTarget->suspensionInfo.GetSelfSusp())
-    {
-        pthrTarget->suspensionInfo.SetSelfSusp(FALSE);
-    }
+        // A self suspending thread that reaches this point would have been resumed
+        // by a call to THREADHandleResumeNative. The self suspension has been 
+        // completed so it can set its selfsusp flag to FALSE. Reset the selfsusp flag 
+        // before checking the return value in case the suspend itself failed.
+        if (pthrTarget->suspensionInfo.GetSelfSusp())
+        {
+            pthrTarget->suspensionInfo.SetSelfSusp(FALSE);
+        }
 
-    if (dwPthreadRet != 0)
-    {
-        ASSERT("[THREADHandleSuspendNative] native suspend_thread call failed [thread id=%d thread_state=%d errno=%d (%s)]\n", 
-            pthrTarget->GetThreadId(), pthrTarget->synchronizationInfo.GetThreadState(), 
-            dwPthreadRet, strerror(dwPthreadRet));
-        return FALSE;
+        if (dwPthreadRet != 0)
+        {
+            ASSERT("[THREADHandleSuspendNative] native suspend_thread call failed [thread id=%d thread_state=%d errno=%d (%s)]\n", 
+                pthrTarget->GetThreadId(), pthrTarget->synchronizationInfo.GetThreadState(), 
+                dwPthreadRet, strerror(dwPthreadRet));
+            return FALSE;
+        }
+
+#if HAVE_MACH_THREADS
+        dwPthreadRet = thread_abort_safely(threadPort);
+        if (dwPthreadRet != 0)
+        {
+            // The thread was suspended in a kernel non-atomic operation that cannot be safely
+            // restarted, so we need to resume the thread and retry
+            thread_resume(threadPort);
+            retry = TRUE;
+        }
+#endif
     }
+    while (retry);
+
     return TRUE;
 }
 

@@ -36,6 +36,7 @@ Thread* ThreadSuspend::m_pThreadAttemptingSuspendForGC;
 CLREventBase * ThreadSuspend::s_hAbortEvt = NULL;
 CLREventBase * ThreadSuspend::s_hAbortEvtCache = NULL;
 
+#ifndef RELIABLE_SUSPEND
 // If you add any thread redirection function, make sure the debugger can 1) recognize the redirection 
 // function, and 2) retrieve the original CONTEXT.  See code:Debugger.InitializeHijackFunctionAddress and
 // code:DacDbiInterfaceImpl.RetrieveHijackedContext. 
@@ -61,6 +62,7 @@ extern "C" void             RedirectedHandledJITCaseForGCStress_Stub(void);
 #endif // HAVE_GCCOVER && USE_REDIRECT_FOR_GCSTRESS
 #endif // _TARGET_AMD64_ || _TARGET_ARM_
 
+#endif // !RELIABLE_SUSPEND
 
 // Every PING_JIT_TIMEOUT ms, check to see if a thread in JITted code has wandered
 // into some fully interruptible code (or should have a different hijack to improve
@@ -2222,12 +2224,12 @@ LRetry:
         {
             fNeedStackCrawl = TRUE;
         }
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
         else
         {
             HandleJITCaseForAbort();
         }
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
 #ifndef DISABLE_THREADSUSPEND
         // The thread is not suspended now.
@@ -3963,7 +3965,7 @@ void RedirectedThreadFrame::ExceptionUnwind()
     m_Regs = NULL;
 }
 
-#ifndef PLATFORM_UNIX
+#ifndef FEATURE_SUSPEND_BY_INJECTION
 
 #ifdef _TARGET_X86_
 //****************************************************************************************
@@ -4106,6 +4108,8 @@ extern "C" PCONTEXT __stdcall GetCurrentSavedRedirectContext()
 
     return pContext;
 }
+
+#ifndef RELIABLE_SUSPEND
 
 void __stdcall Thread::RedirectedHandledJITCase(RedirectReason reason)
 {
@@ -4715,7 +4719,9 @@ BOOL Thread::CheckForAndDoRedirectForGCStress (CONTEXT *pCurrentThreadCtx)
 }
 #endif // HAVE_GCCOVER && USE_REDIRECT_FOR_GCSTRESS
 
-#endif // !PLATFORM_UNIX
+#endif // !RELIABLE_SUSPEND
+
+#endif // !FEATURE_SUSPEND_BY_INJECTION
 #endif // FEATURE_HIJACK
 
 
@@ -4988,18 +4994,18 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                 FastInterlockOr((ULONG *) &thread->m_State, Thread::TS_GCSuspendPending);
                 countThreads++;
 
-#if defined(FEATURE_HIJACK) && defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && defined(FEATURE_SUSPEND_BY_INJECTION)
                 bool gcSuspensionSignalSuccess = thread->InjectGcSuspension();
                 if (!gcSuspensionSignalSuccess)
                 {
                     STRESS_LOG1(LF_SYNC, LL_INFO1000, "Thread::SuspendRuntime() -   Failed to raise GC suspension signal for thread %p.\n", thread);
                 }
-#endif // FEATURE_HIJACK && PLATFORM_UNIX
+#endif // FEATURE_HIJACK && FEATURE_SUSPEND_BY_INJECTION
             }
 
 #else // DISABLE_THREADSUSPEND
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION) && !defined(RELIABLE_SUSPEND)
             DWORD dwSwitchCount = 0;
     RetrySuspension:
 #endif
@@ -5041,7 +5047,7 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                 // is where we try to hijack/redirect the thread.  If it's in VM code, we have to just let the VM
                 // finish what it's doing.
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
                 // Only check for HandledJITCase if we actually suspended the thread.
                 if (str == Thread::STR_Success)
                 {
@@ -5059,6 +5065,7 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                     //
                     if (workingOnThreadContext.Acquired() && thread->HandledJITCase())
                     {
+#ifndef RELIABLE_SUSPEND
                         // Redirect thread so we can capture a good thread context
                         // (GetThreadContext is not sufficient, due to an OS bug).
                         if (!thread->CheckForAndDoRedirectForGC())
@@ -5076,9 +5083,16 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                             g_SuspendStatistics.cntRedirections++;
 #endif
                         STRESS_LOG1(LF_SYNC, LL_INFO1000, "Thread::SuspendRuntime() -   Thread %p redirected().\n", thread);
+#else // !RELIABLE_SUSPEND
+                        STRESS_LOG1(LF_SYNC, LL_INFO1000, "Thread::SuspendRuntime() -   Thread %p suspended().\n", thread);
+                        // The thread was suspended at a place where it doesn't hold any OS locks
+                        pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
+                        thread->SetThreadState(Thread::TS_Suspended);
+                        continue;
+#endif // !RELIABLE_SUSPEND
                     }
                 }
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
                 FastInterlockOr((ULONG *) &thread->m_State, Thread::TS_GCSuspendPending);
 
@@ -5331,7 +5345,7 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
             }
 #endif
 
-#if defined(FEATURE_HIJACK) && defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && defined(FEATURE_SUSPEND_BY_INJECTION)
             _ASSERTE (thread == NULL);
             while ((thread = ThreadStore::GetThreadList(thread)) != NULL)
             {
@@ -5353,7 +5367,7 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                     STRESS_LOG1(LF_SYNC, LL_INFO1000, "Thread::SuspendRuntime() -   Failed to raise GC suspension signal for thread %p.\n", thread);
                 }
             }
-#endif
+#endif // FEATURE_HIJACK && FEATURE_SUSPEND_BY_INJECTION
 
 #ifndef DISABLE_THREADSUSPEND
             // all these threads should be in cooperative mode unless they have
@@ -5372,7 +5386,7 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                 if (!thread->m_fPreemptiveGCDisabled)
                     continue;
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION) && !defined(RELIABLE_SUSPEND)
             RetrySuspension2:
 #endif
                 // We can not allocate memory after we suspend a thread.
@@ -5396,7 +5410,7 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                     g_SuspendStatistics.cntFailedSuspends++;
 #endif
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
                 // Only check HandledJITCase if we actually suspended the thread, and
                 // the thread is in cooperative mode.
                 // See comment at the previous invocation of HandledJITCase - it does
@@ -5406,6 +5420,7 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                     Thread::WorkingOnThreadContextHolder workingOnThreadContext(thread);
                     if (workingOnThreadContext.Acquired() && thread->HandledJITCase())
                     {
+#ifndef RELIABLE_SUSPEND                        
                         // Redirect thread so we can capture a good thread context
                         // (GetThreadContext is not sufficient, due to an OS bug).
                         if (!thread->CheckForAndDoRedirectForGC())
@@ -5421,9 +5436,16 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                         else
                             g_SuspendStatistics.cntRedirections++;
 #endif
+#else // !RELIABLE_SUSPEND
+                        // The thread was suspended at a place where it doesn't hold any OS locks
+                        pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
+                        thread->SetThreadState(Thread::TS_Suspended);
+                        // TODO: not sure if this is ok
+                        continue;
+#endif // !RELIABLE_SUSPEND
                     }
                 }
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
                 if (str == Thread::STR_Success)
                     thread->ResumeThread();
@@ -5600,6 +5622,30 @@ void ThreadSuspend::ResumeRuntime(BOOL bFinishedGC, BOOL SuspendSucceded)
 #ifdef TIME_SUSPEND
     DWORD startRelease = g_SuspendStatistics.GetTime();
 #endif
+
+#ifdef RELIABLE_SUSPEND
+    // We need to resume threads that were suspended and left suspended
+    Thread* thread = NULL;
+    while ((thread = ThreadStore::GetThreadList(thread)) != NULL)
+    {
+        if (thread == pCurThread)
+            continue;
+
+        // TODO: need to add flag to the thread to indicate suspended state
+        // also, need to decrement the suspend 
+        // Problem - no more thread states available
+        if (thread->HasThreadState(Thread::TS_Suspended))
+        {
+            thread->ResetThreadState(Thread::TS_Suspended);
+            pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock--;
+            thread->ResumeThread();
+            STRESS_LOG2(LF_SYNC, LL_INFO1000, "    Resuming thread 0x%x ID 0x%x after GC\n",
+                thread, thread->GetThreadId());
+        }
+    }
+
+    _ASSERTE(pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock == 0);
+#endif    
 
     //
     // Unlock the thread store.  At this point, all threads should be allowed to run.
@@ -5780,7 +5826,7 @@ ThrowControlForThread(
 }
 #endif // !FEATURE_PAL
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
 // This function is called by UserAbort and StopEEAndUnwindThreads.
 // It forces a thread to abort if allowed and the thread is running managed code.
 BOOL Thread::HandleJITCaseForAbort()
@@ -5916,7 +5962,7 @@ BOOL Thread::ResumeUnderControl(CONTEXT *pCtx)
     return fSuccess;
 }
 
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
 
 PCONTEXT Thread::GetAbortContext ()
@@ -6016,10 +6062,10 @@ bool Thread::SysStartSuspendForDebug(AppDomain *pAppDomain)
         // switch back and forth during a debug suspension -- until we
         // can get their Pending bit set.
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION) && !defined(RELIABLE_SUSPEND)
         DWORD dwSwitchCount = 0;
     RetrySuspension:
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
         // We can not allocate memory after we suspend a thread.
         // Otherwise, we may deadlock the process when CLR is hosted.
@@ -6044,10 +6090,11 @@ bool Thread::SysStartSuspendForDebug(AppDomain *pAppDomain)
         if (thread->m_fPreemptiveGCDisabled && str == STR_Success)
         {
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
             WorkingOnThreadContextHolder workingOnThreadContext(thread);
             if (workingOnThreadContext.Acquired() && thread->HandledJITCase())
             {
+#ifndef RELIABLE_SUSPEND
                 // Redirect thread so we can capture a good thread context
                 // (GetThreadContext is not sufficient, due to an OS bug).
                 // If we don't succeed (should only happen on Win9X, due to
@@ -6059,8 +6106,15 @@ bool Thread::SysStartSuspendForDebug(AppDomain *pAppDomain)
                     __SwitchToThread(0, ++dwSwitchCount);
                     goto RetrySuspension;
                 }
+#else // !RELIABLE_SUSPEND
+                // The thread was suspended at a place where it doesn't hold any OS locks
+                pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
+                thread->SetThreadState(Thread::TS_Suspended);
+                // TODO: is it ok?
+                continue;
+#endif // !RELIABLE_SUSPEND                
             }
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
             // Remember that this thread will be running to a safe point
             FastInterlockIncrement(&m_DebugWillSyncCount);
@@ -6207,7 +6261,7 @@ bool Thread::SysSweepThreadsForDebug(bool forceSync)
 #else // DISABLE_THREADSUSPEND
         // Suspend the thread
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
         DWORD dwSwitchCount = 0;
 #endif
 
@@ -6255,7 +6309,7 @@ RetrySuspension:
 
             goto Label_MarkThreadAsSynced;
         }
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
         // If the thread is in jitted code, HandledJitCase will try to hijack it; and the hijack
         // will toggle the GC.
         else
@@ -6264,6 +6318,7 @@ RetrySuspension:
             WorkingOnThreadContextHolder workingOnThreadContext(thread);
             if (workingOnThreadContext.Acquired() && thread->HandledJITCase())
             {
+#ifndef RELIABLE_SUSPEND                                  
                 // Redirect thread so we can capture a good thread context
                 // (GetThreadContext is not sufficient, due to an OS bug).
                 // If we don't succeed (should only happen on Win9X, due to
@@ -6281,9 +6336,17 @@ RetrySuspension:
                 // if the thread is hijacked, it's as good as synced, so mark it now.
                 thread->ResumeThread();
                 goto Label_MarkThreadAsSynced;
+#else // !RELIABLE_SUSPEND
+                // The thread was suspended at a place where it doesn't hold any OS locks
+                Thread * pCurThread = GetThread();
+                pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
+                thread->SetThreadState(Thread::TS_Suspended);
+                // TODO: is it ok?
+                continue;
+#endif // !RELIABLE_SUSPEND                                   
             }
         }
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
         // If we didn't take the thread out of the set, then resume it and give it another chance to reach a safe
         // point.
@@ -6520,7 +6583,7 @@ RetrySuspension:
             else
             {
                 _ASSERTE(str == STR_Success);
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
                 WorkingOnThreadContextHolder workingOnThreadContext(this);
                 if (workingOnThreadContext.Acquired() && HandledJITCase())
                 {
@@ -6536,7 +6599,7 @@ RetrySuspension:
                         goto RetrySuspension;
                     }
                 }
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
                 // Thread is executing in cooperative mode.  We're going to have to
                 // move it to a safe spot.
@@ -6649,7 +6712,7 @@ void Thread::FinishSuspendingThread()
 #endif
             // Suspend the thread and see if we are in interruptible code (placing
             // a hijack if warranted).
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
         RetrySuspension:
 #endif
             // The thread is detached/dead.  Suspend is no op.
@@ -6666,7 +6729,7 @@ void Thread::FinishSuspendingThread()
 
             if (m_fPreemptiveGCDisabled && str == STR_Success)
             {
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
                 WorkingOnThreadContextHolder workingOnThreadContext(this);
                 if (workingOnThreadContext.Acquired() && HandledJITCase())
                 {
@@ -6682,7 +6745,7 @@ void Thread::FinishSuspendingThread()
                         goto RetrySuspension;
                     }
                 }
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
                 // Keep trying...
                 ResumeThread();
             }
@@ -7327,7 +7390,7 @@ void STDCALL OnHijackScalarWorker(HijackArgs * pArgs)
 #endif
 }
 
-#ifndef PLATFORM_UNIX
+#ifndef FEATURE_SUSPEND_BY_INJECTION
 
 // Get the ExecutionState for the specified SwitchIn thread.  Note that this is
 // a 'StackWalk' call back (PSTACKWALKFRAMESCALLBACK).
@@ -7842,7 +7905,7 @@ BOOL Thread::HandledJITCase(BOOL ForTaskSwitchIn)
     return ret;
 }
 
-#endif // !PLATFORM_UNIX
+#endif // !FEATURE_SUSPEND_BY_INJECTION
 
 #endif // FEATURE_HIJACK
 
@@ -8250,7 +8313,7 @@ retry_for_debugger:
 #endif //TIME_SUSPEND
 }
 
-#if defined(FEATURE_HIJACK) && defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && defined(FEATURE_SUSPEND_BY_INJECTION)
 
 // This function is called when a GC is pending. It tries to ensure that the current
 // thread is taken to a GC-safe place as quickly as possible. It does this by doing 
@@ -8377,7 +8440,7 @@ bool Thread::InjectGcSuspension()
     return false;
 }
 
-#endif // FEATURE_HIJACK && PLATFORM_UNIX
+#endif // FEATURE_HIJACK && FEATURE_SUSPEND_BY_INJECTION
 
 #ifdef _DEBUG
 BOOL Debug_IsLockedViaThreadSuspension()

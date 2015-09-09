@@ -2739,10 +2739,12 @@ private:
     enum HijackFunction
     {
         kUnhandledException = 0,
+#ifndef RELIABLE_SUSPEND                    
         kRedirectedForGCThreadControl,
         kRedirectedForDbgThreadControl,
         kRedirectedForUserSuspend,
         kRedirectedForYieldTask,
+#endif // !RELIABLE_SUSPEND                    
         kMaxHijackFunctions,
     };
 
@@ -2820,6 +2822,7 @@ void STDCALL ExceptionHijack(void);
 void STDCALL ExceptionHijackEnd(void);
 void STDCALL ExceptionHijackWorker(T_CONTEXT * pContext, EXCEPTION_RECORD * pRecord, EHijackReason::EHijackReason reason, void * pData);
 
+#ifndef RELIABLE_SUSPEND
 void RedirectedHandledJITCaseForGCThreadControl_Stub();
 void RedirectedHandledJITCaseForGCThreadControl_StubEnd();
 
@@ -2831,6 +2834,7 @@ void RedirectedHandledJITCaseForUserSuspend_StubEnd();
 
 void RedirectedHandledJITCaseForYieldTask_Stub();
 void RedirectedHandledJITCaseForYieldTask_StubEnd();
+#endif // RELIABLE_SUSPEND
 };
 
 

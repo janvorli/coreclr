@@ -1287,8 +1287,24 @@ void *SEHExceptionThread(void *args)
             CONTEXT sContext;
             hThread = sMessage.GetThreadContext(&sContext);
 
-            MachRet = thread_suspend(hThread);
-            CHECK_MACH("thread_suspend", MachRet);
+            while (true)
+            {
+                MachRet = thread_suspend(hThread);
+                CHECK_MACH("thread_suspend", MachRet);
+
+                // Ensure that if the thread was running in the kernel, the kernel operation
+                // is safely aborted so that it can be restarted later.
+                MachRet = thread_abort_safely(hThread);
+                if (MachRet == KERN_SUCCESS)
+                {
+                    break;
+                }
+
+                // The thread was running in the kernel executing a non-atomic operation
+                // that cannot be restarted, so we need to resume the thread and retry
+                MachRet = thread_resume(hThread);
+                CHECK_MACH("thread_resume", MachRet);
+            }
 
             MachRet = CONTEXT_SetThreadContextOnPort(hThread, &sContext);
             CHECK_MACH("CONTEXT_SetThreadContextOnPort", MachRet);

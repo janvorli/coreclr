@@ -1004,7 +1004,7 @@ Debugger::~Debugger()
     _ASSERTE(!"Debugger dtor should not be called.");   
 }
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
 typedef void (*PFN_HIJACK_FUNCTION) (void);
 
 // Given the start address and the end address of a function, return a MemoryRange for the function.
@@ -1018,6 +1018,7 @@ inline MemoryRange GetMemoryRangeForFunction(PFN_HIJACK_FUNCTION pfnStart, PFN_H
 // static
 MemoryRange Debugger::s_hijackFunction[kMaxHijackFunctions] = 
     {GetMemoryRangeForFunction(ExceptionHijack, ExceptionHijackEnd),
+#ifndef RELIABLE_SUSPEND
      GetMemoryRangeForFunction(RedirectedHandledJITCaseForGCThreadControl_Stub,
                                RedirectedHandledJITCaseForGCThreadControl_StubEnd),
      GetMemoryRangeForFunction(RedirectedHandledJITCaseForDbgThreadControl_Stub,
@@ -1025,17 +1026,19 @@ MemoryRange Debugger::s_hijackFunction[kMaxHijackFunctions] =
      GetMemoryRangeForFunction(RedirectedHandledJITCaseForUserSuspend_Stub,
                                RedirectedHandledJITCaseForUserSuspend_StubEnd),
      GetMemoryRangeForFunction(RedirectedHandledJITCaseForYieldTask_Stub,
-                               RedirectedHandledJITCaseForYieldTask_StubEnd)};
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+                               RedirectedHandledJITCaseForYieldTask_StubEnd)
+#endif // !RELIABLE_SUSPEND
+    };
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
 // Save the necessary information for the debugger to recognize an IP in one of the thread redirection 
 // functions.
 void Debugger::InitializeHijackFunctionAddress()
 {
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
     // Advertise hijack address for the DD Hijack primitive
     m_rgHijackFunction = Debugger::s_hijackFunction;
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 }
 
 // For debug-only builds, we'll have a debugging feature to count

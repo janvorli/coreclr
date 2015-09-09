@@ -557,14 +557,15 @@ EXTERN_C void LeaveSyncHelper    (UINT_PTR caller, void *pAwareLock);
 // Used to capture information about the state of execution of a *SUSPENDED* thread.
 struct ExecutionState;
 
-#ifndef PLATFORM_UNIX
+#ifndef FEATURE_SUSPEND_BY_INJECTION
+
 // This is the type of the start function of a redirected thread pulled from
 // a HandledJITCase during runtime suspension
 typedef void (__stdcall *PFN_REDIRECTTARGET)();
 
 // Describes the weird argument sets during hijacking
 struct HijackArgs;
-#endif // !PLATFORM_UNIX
+#endif // !FEATURE_SUSPEND_BY_INJECTION
 
 #endif // FEATURE_HIJACK
 
@@ -1166,6 +1167,8 @@ public:
 
         TS_InSTA                  = 0x00004000,    // Thread hosts an STA
         TS_InMTA                  = 0x00008000,    // Thread is part of the MTA
+#else
+        TS_Suspended              = 0x00002000,
 #endif // FEATURE_COMINTEROP_APARTMENT_SUPPORT
 
         // Some bits that only have meaning for reporting the state to clients.
@@ -2868,9 +2871,9 @@ public:
         STR_SwitchedOut,
     };
 
-#if defined(FEATURE_HIJACK) && defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && defined(FEATURE_SUSPEND_BY_INJECTION)
     bool InjectGcSuspension();
-#endif // FEATURE_HIJACK && PLATFORM_UNIX
+#endif // FEATURE_HIJACK && FEATURE_SUSPEND_BY_INJECTION
 
 #ifndef DISABLE_THREADSUSPEND
     // SuspendThread
@@ -3291,10 +3294,10 @@ public:
         return s_NextSelfAbortEndTime;
     }
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION)
     // Tricks for resuming threads from fully interruptible code with a ThreadStop.
     BOOL           ResumeUnderControl(T_CONTEXT *pCtx);
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION
 
     enum InducedThrowReason {
         InducedThreadStop = 1,
@@ -3714,7 +3717,7 @@ private:
     ARG_SLOT CallPropertyGet(BinderMethodID id, OBJECTREF pObject);
     ARG_SLOT CallPropertySet(BinderMethodID id, OBJECTREF pObject, OBJECTREF pValue);
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION) && !defined(RELIABLE_SUSPEND)
     // Used in suspension code to redirect a thread at a HandledJITCase
     BOOL RedirectThreadAtHandledJITCase(PFN_REDIRECTTARGET pTgt);
     BOOL RedirectCurrentThreadAtHandledJITCase(PFN_REDIRECTTARGET pTgt, T_CONTEXT *pCurrentThreadCtx);
@@ -3736,7 +3739,7 @@ public:
 private:
     bool        m_fPreemptiveGCDisabledForGCStress;
 #endif // HAVE_GCCOVER && USE_REDIRECT_FOR_GCSTRESS
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION && !RELIABLE_SUSPEND
 
 public:
 
@@ -3869,7 +3872,7 @@ public:
     // is optional.
     static BOOL CommitThreadStack(Thread* pThreadOptional);
 
-#if defined(FEATURE_HIJACK) && !defined(PLATFORM_UNIX)
+#if defined(FEATURE_HIJACK) && !defined(FEATURE_SUSPEND_BY_INJECTION) && !defined(RELIABLE_SUSPEND)
 private:
     // Redirecting of threads in managed code at suspension
 
@@ -3892,7 +3895,7 @@ private:
 #endif // defined(HAVE_GCCOVER) && USE_REDIRECT_FOR_GCSTRESS
 
     friend void CPFH_AdjustContextForThreadSuspensionRace(T_CONTEXT *pContext, Thread *pThread);
-#endif // FEATURE_HIJACK && !PLATFORM_UNIX
+#endif // FEATURE_HIJACK && !FEATURE_SUSPEND_BY_INJECTION && !RELIABLE_SUSPEND
 
 private:
     //-------------------------------------------------------------
@@ -4015,7 +4018,7 @@ private:
     VOID       **m_ppvHJRetAddrPtr;       // place we bashed a new return address
     MethodDesc  *m_HijackedFunction;      // remember what we hijacked
 
-#ifndef PLATFORM_UNIX
+#ifndef FEATURE_SUSPEND_BY_INJECTION
     BOOL    HandledJITCase(BOOL ForTaskSwitchIn = FALSE);
 
 #ifdef _TARGET_X86_
@@ -4023,7 +4026,7 @@ private:
     ULONG       m_SpinCount;
 #endif // _TARGET_X86_
 
-#endif // !PLATFORM_UNIX
+#endif // !FEATURE_SUSPEND_BY_INJECTION
 
 #endif // FEATURE_HIJACK
 
