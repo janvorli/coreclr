@@ -179,7 +179,10 @@ void  Thread::SetFrame(Frame *pFrame)
     if (g_pConfig->fAssertOnFailFast() == false)
         return;
 
-    Frame* espVal = (Frame*)GetCurrentSP();
+    // When SetFrame is called by another thread, we cannot get the SP
+    // via the GetCurrentSP. 
+    // TODO: read it from the context?
+    Frame* espVal = (this == GetThread()) ? (Frame*)GetCurrentSP() : NULL;
 
     while (pFrame != (Frame*) -1)
     {
@@ -187,7 +190,7 @@ void  Thread::SetFrame(Frame *pFrame)
         if (pFrame == stopFrame)
             _ASSERTE(!"SetFrame frame == stopFrame");
 
-        _ASSERTE(espVal < pFrame);
+        _ASSERTE(espVal < pFrame));
         _ASSERTE(pFrame < m_CacheStackBase);
         _ASSERTE(pFrame->GetFrameType() < Frame::TYPE_COUNT);
 

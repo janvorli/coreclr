@@ -226,6 +226,15 @@ CThreadSuspensionInfo::InternalSuspendNewThreadFromData(
         palError = ERROR_INTERNAL_ERROR;
     }
 
+    if (palError == NO_ERROR)
+    {
+        AcquireSuspensionLock(pThread);
+        pThread->suspensionInfo.DecrSuspCount();
+        // TODO: I have just blindly added this, is it needed?
+        pThread->suspensionInfo.SetSelfSusp(FALSE);
+        ReleaseSuspensionLock(pThread);
+    }
+
     // Close the pipes regardless of whether we were successful.
     close(pipe_descs[0]);
     close(pipe_descs[1]);
@@ -1847,7 +1856,7 @@ CThreadSuspensionInfo::THREADHandleSuspendNative(CPalThread *pthrTarget)
 #if HAVE_PTHREAD_SUSPEND
         dwPthreadRet = pthread_suspend(pthrTarget->GetPThreadSelf());
 #elif HAVE_MACH_THREADS
-        mach_port_t threadPort = pthread_mach_thread_np(pthrTarget->GetPThreadSelf());
+        mach_port_t threadPort = pthrTarget->GetMachPortSelf();
         dwPthreadRet = thread_suspend(threadPort);
 #elif HAVE_PTHREAD_SUSPEND_NP
 #if SELF_SUSPEND_FAILS_WITH_NATIVE_SUSPENSION
@@ -1938,7 +1947,7 @@ CThreadSuspensionInfo::THREADHandleResumeNative(CPalThread *pthrTarget)
 #if HAVE_PTHREAD_CONTINUE
         dwPthreadRet = pthread_continue(pthrTarget->GetPThreadSelf());
 #elif HAVE_MACH_THREADS
-        dwPthreadRet = thread_resume(pthread_mach_thread_np(pthrTarget->GetPThreadSelf()));
+        dwPthreadRet = thread_resume(pthrTarget->GetMachPortSelf());
 #elif HAVE_PTHREAD_CONTINUE_NP
         dwPthreadRet = pthread_continue_np((pthrTarget->GetPThreadSelf());
 #elif HAVE_PTHREAD_RESUME_NP

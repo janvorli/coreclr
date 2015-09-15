@@ -1364,7 +1364,7 @@ GetThreadTimes(
     pthrTarget->Lock(pthrCurrent);
 	
     mach_port_t mhThread;
-    mhThread = pthread_mach_thread_np(pthrTarget->GetPThreadSelf());
+    mhThread = pthrTarget->GetMachPortSelf();
 	
 	kern_return_t status;
 	status = thread_info(
@@ -1466,6 +1466,9 @@ CPalThread::ThreadEntry(
 
     pThread->m_threadId = THREADSilentGetCurrentThreadId();
     pThread->m_pthreadSelf = pthread_self();
+#if HAVE_MACH_THREADS
+    pThread->m_machPortSelf = pthread_mach_thread_np(pThread->m_pthreadSelf);
+#endif
 #if HAVE_THREAD_SELF
     pThread->m_dwLwpId = (DWORD) thread_self();
 #elif HAVE__LWP_SELF
@@ -1638,6 +1641,9 @@ CorUnix::CreateThreadData(
 
     pThread->m_threadId = THREADSilentGetCurrentThreadId();
     pThread->m_pthreadSelf = pthread_self();
+#if HAVE_MACH_THREADS
+    pThread->m_machPortSelf = pthread_mach_thread_np(pThread->m_pthreadSelf);
+#endif
 #if HAVE_THREAD_SELF
     pThread->m_dwLwpId = (DWORD) thread_self();
 #elif HAVE__LWP_SELF

@@ -5088,6 +5088,24 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                         // The thread was suspended at a place where it doesn't hold any OS locks
                         pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
                         thread->SetThreadState(Thread::TS_Suspended);
+                        
+                        // Create helper frame on the thread's stack so that the top of stack is always an explicit frame
+                        CONTEXT context;
+                        ZeroMemory(&context, sizeof(context));
+                        context.ContextFlags = CONTEXT_FULL;
+                        thread->GetThreadContext(&context);
+
+                        size_t sp = GetSP(&context);
+                        sp -= sizeof(FrameWithCookie<RedirectedThreadFrame>) + sizeof(CONTEXT);
+                        sp &= ~0xf;
+                        CONTEXT* helperContext = (CONTEXT*)sp;
+                        *helperContext = context;
+
+                        sp += sizeof(CONTEXT);
+                        FrameWithCookie<RedirectedThreadFrame>* helperFrame = new ((void*)sp) FrameWithCookie<RedirectedThreadFrame>(helperContext);
+                        helperFrame->Push(thread);
+                        STRESS_LOG1(LF_SYNC, LL_INFO1000, "Context pointed to by the frame at %p\n", helperContext);
+
                         continue;
 #endif // !RELIABLE_SUSPEND
                     }
@@ -5440,7 +5458,6 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                         // The thread was suspended at a place where it doesn't hold any OS locks
                         pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
                         thread->SetThreadState(Thread::TS_Suspended);
-                        // TODO: not sure if this is ok
                         continue;
 #endif // !RELIABLE_SUSPEND
                     }
@@ -5631,16 +5648,17 @@ void ThreadSuspend::ResumeRuntime(BOOL bFinishedGC, BOOL SuspendSucceded)
         if (thread == pCurThread)
             continue;
 
-        // TODO: need to add flag to the thread to indicate suspended state
-        // also, need to decrement the suspend 
-        // Problem - no more thread states available
         if (thread->HasThreadState(Thread::TS_Suspended))
         {
             thread->ResetThreadState(Thread::TS_Suspended);
+            RedirectedThreadFrame* frame = (RedirectedThreadFrame*)thread->GetFrame();
+            thread->SetThreadContext(frame->GetContext());
+            // TODO: delete the frame in-place
             pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock--;
-            thread->ResumeThread();
+            frame->Pop(thread);
             STRESS_LOG2(LF_SYNC, LL_INFO1000, "    Resuming thread 0x%x ID 0x%x after GC\n",
                 thread, thread->GetThreadId());
+            thread->ResumeThread();
         }
     }
 
@@ -6110,7 +6128,7 @@ bool Thread::SysStartSuspendForDebug(AppDomain *pAppDomain)
                 // The thread was suspended at a place where it doesn't hold any OS locks
                 pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
                 thread->SetThreadState(Thread::TS_Suspended);
-                // TODO: is it ok?
+                // TODO: is it ok? Don't we need to signal the debugger somehow?
                 continue;
 #endif // !RELIABLE_SUSPEND                
             }
@@ -6341,7 +6359,6 @@ RetrySuspension:
                 Thread * pCurThread = GetThread();
                 pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
                 thread->SetThreadState(Thread::TS_Suspended);
-                // TODO: is it ok?
                 continue;
 #endif // !RELIABLE_SUSPEND                                   
             }
@@ -7776,6 +7793,28 @@ BOOL Thread::HandledJITCase(BOOL ForTaskSwitchIn)
     {
         STRESS_LOG0(LF_GC, LL_INFO10000, "HandledJITCase() - GetSafelyRedirectableThreadContext() returned FALSE\n");
         return FALSE;
+    }
+
+    CONTEXT c1, c2;
+
+    ZeroMemory(&c1, sizeof(c1));
+    ZeroMemory(&c2, sizeof(c2));
+    c1.ContextFlags = CONTEXT_FULL | CONTEXT_EXCEPTION_REQUEST;
+    c2.ContextFlags = CONTEXT_FULL | CONTEXT_EXCEPTION_REQUEST;
+
+    if (!EEGetThreadContext(this, &c1))
+    {
+        __debugbreak();
+    }
+
+    if (!EEGetThreadContext(this, &c2))
+    {
+        __debugbreak();
+    }
+
+    if (c1.Rip != c2.Rip || c1.Rsp != c2.Rsp || c1.Rbp != c2.Rbp)
+    {
+        __debugbreak();        
     }
 
     if (!ExecutionManager::IsManagedCode(GetIP(&ctx)))
