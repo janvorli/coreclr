@@ -4786,6 +4786,87 @@ void __stdcall PauseAPC(__in ULONG_PTR dwParam)
     }
 }
 
+#ifdef RELIABLE_SUSPEND
+void ThreadSuspend::KeepThreadSuspended(Thread* thread)
+{
+    // TODO: is this the right contract?
+    CONTRACTL {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    STRESS_LOG1(LF_SYNC, LL_INFO1000, "   Thread %p suspended.\n", thread);
+
+#ifdef _DEBUG
+    // The thread was suspended at a place where it doesn't hold any OS locks
+    Thread  *pCurThread = GetThread();
+    pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
+#endif // _DEBUG
+
+    thread->SetThreadState(Thread::TS_Suspended);
+    
+    // Create helper frame and context on top of the suspended thread's stack as a
+    // starting point for the stack walker.
+    CONTEXT context;
+    ZeroMemory(&context, sizeof(context));
+    context.ContextFlags = CONTEXT_FULL;
+    thread->GetThreadContext(&context);
+
+    size_t sp = GetSP(&context);
+    sp -= sizeof(CONTEXT);
+    sp = ALIGN_DOWN(sp, 16);
+    CONTEXT* helperContext = (CONTEXT*)sp;
+
+    // Store the current context on the stack so that GC or debugger can update it
+    // and we can restore it when resuming the thread.
+    *helperContext = context;
+
+    sp -= sizeof(FrameWithCookie<RedirectedThreadFrame>);
+    sp = ALIGN_DOWN(sp, 16);
+    FrameWithCookie<RedirectedThreadFrame>* helperFrame = 
+        new ((void*)sp) FrameWithCookie<RedirectedThreadFrame>(helperContext);
+
+    helperFrame->Push(thread);
+}
+
+void ThreadSuspend::ResumeThreadFinal(Thread* thread)
+{
+    CONTRACTL {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    STRESS_LOG2(LF_SYNC, LL_INFO1000, "    Resuming thread 0x%x ID 0x%x after GC\n",
+        thread, thread->GetThreadId());
+
+#ifdef _DEBUG
+    // The thread was suspended at a place where it didn't hold any OS locks, so
+    // we need to decrement the count
+    Thread  *pCurThread = GetThread();
+    pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock--;
+#endif // _DEBUG
+
+    RedirectedThreadFrame* frame = (RedirectedThreadFrame*)thread->GetFrame();
+
+    // Update the thread's context so that possible changes made to the context
+    // by GC or debugger are not lost.
+    thread->SetThreadContext(frame->GetContext());
+
+    // Remove the helper frame from the thread's list of frames
+    frame->Pop(thread);
+
+    // Call destructor of the helper frame
+    FrameWithCookie<RedirectedThreadFrame>* helperFrame = 
+        (FrameWithCookie<RedirectedThreadFrame>*)frame->GetGSCookiePtr();
+    helperFrame->~FrameWithCookie<RedirectedThreadFrame>();
+
+    thread->ResetThreadState(Thread::TS_Suspended);
+    thread->ResumeThread();
+}
+
+#endif // RELIABLE_SUSPEND
 
 //************************************************************************************
 //
@@ -5084,28 +5165,8 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
 #endif
                         STRESS_LOG1(LF_SYNC, LL_INFO1000, "Thread::SuspendRuntime() -   Thread %p redirected().\n", thread);
 #else // !RELIABLE_SUSPEND
-                        STRESS_LOG1(LF_SYNC, LL_INFO1000, "Thread::SuspendRuntime() -   Thread %p suspended().\n", thread);
-                        // The thread was suspended at a place where it doesn't hold any OS locks
-                        pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
-                        thread->SetThreadState(Thread::TS_Suspended);
-                        
-                        // Create helper frame on the thread's stack so that the top of stack is always an explicit frame
-                        CONTEXT context;
-                        ZeroMemory(&context, sizeof(context));
-                        context.ContextFlags = CONTEXT_FULL;
-                        thread->GetThreadContext(&context);
 
-                        size_t sp = GetSP(&context);
-                        sp -= sizeof(FrameWithCookie<RedirectedThreadFrame>) + sizeof(CONTEXT);
-                        sp &= ~0xf;
-                        CONTEXT* helperContext = (CONTEXT*)sp;
-                        *helperContext = context;
-
-                        sp += sizeof(CONTEXT);
-                        FrameWithCookie<RedirectedThreadFrame>* helperFrame = new ((void*)sp) FrameWithCookie<RedirectedThreadFrame>(helperContext);
-                        helperFrame->Push(thread);
-                        STRESS_LOG1(LF_SYNC, LL_INFO1000, "Context pointed to by the frame at %p\n", helperContext);
-
+                        KeepThreadSuspended(thread);
                         continue;
 #endif // !RELIABLE_SUSPEND
                     }
@@ -5455,9 +5516,8 @@ HRESULT ThreadSuspend::SuspendRuntime(ThreadSuspend::SUSPEND_REASON reason)
                             g_SuspendStatistics.cntRedirections++;
 #endif
 #else // !RELIABLE_SUSPEND
-                        // The thread was suspended at a place where it doesn't hold any OS locks
-                        pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
-                        thread->SetThreadState(Thread::TS_Suspended);
+
+                        KeepThreadSuspended(thread);
                         continue;
 #endif // !RELIABLE_SUSPEND
                     }
@@ -5650,15 +5710,7 @@ void ThreadSuspend::ResumeRuntime(BOOL bFinishedGC, BOOL SuspendSucceded)
 
         if (thread->HasThreadState(Thread::TS_Suspended))
         {
-            thread->ResetThreadState(Thread::TS_Suspended);
-            RedirectedThreadFrame* frame = (RedirectedThreadFrame*)thread->GetFrame();
-            thread->SetThreadContext(frame->GetContext());
-            // TODO: delete the frame in-place
-            pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock--;
-            frame->Pop(thread);
-            STRESS_LOG2(LF_SYNC, LL_INFO1000, "    Resuming thread 0x%x ID 0x%x after GC\n",
-                thread, thread->GetThreadId());
-            thread->ResumeThread();
+            ResumeThreadFinal(thread);
         }
     }
 
@@ -6125,10 +6177,7 @@ bool Thread::SysStartSuspendForDebug(AppDomain *pAppDomain)
                     goto RetrySuspension;
                 }
 #else // !RELIABLE_SUSPEND
-                // The thread was suspended at a place where it doesn't hold any OS locks
-                pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
-                thread->SetThreadState(Thread::TS_Suspended);
-                // TODO: is it ok? Don't we need to signal the debugger somehow?
+                KeepThreadSuspended(thread);
                 continue;
 #endif // !RELIABLE_SUSPEND                
             }
@@ -6355,10 +6404,7 @@ RetrySuspension:
                 thread->ResumeThread();
                 goto Label_MarkThreadAsSynced;
 #else // !RELIABLE_SUSPEND
-                // The thread was suspended at a place where it doesn't hold any OS locks
-                Thread * pCurThread = GetThread();
-                pCurThread->dbg_m_cSuspendedThreadsWithoutOSLock++;
-                thread->SetThreadState(Thread::TS_Suspended);
+                KeepThreadSuspended(thread);
                 continue;
 #endif // !RELIABLE_SUSPEND                                   
             }
@@ -6477,6 +6523,13 @@ void Thread::SysResumeFromDebug(AppDomain *pAppDomain)
             _ASSERTE((thread->m_State & TS_DebugWillSync) == 0);
 
         }
+
+#ifdef RELIABLE_SUSPEND
+        if (thread->HasThreadState(Thread::TS_Suspended))
+        {
+            ResumeThreadFinal(thread);
+        }
+#endif // RELIABLE_SUSPEND        
     }
 
     LOG((LF_CORDB, LL_INFO1000, "RESUME: resume complete. Trap count: %d\n", g_TrapReturningThreads.Load()));

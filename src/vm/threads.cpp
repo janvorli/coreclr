@@ -190,7 +190,7 @@ void  Thread::SetFrame(Frame *pFrame)
         if (pFrame == stopFrame)
             _ASSERTE(!"SetFrame frame == stopFrame");
 
-        _ASSERTE(espVal < pFrame));
+        _ASSERTE(espVal < pFrame);
         _ASSERTE(pFrame < m_CacheStackBase);
         _ASSERTE(pFrame->GetFrameType() < Frame::TYPE_COUNT);
 

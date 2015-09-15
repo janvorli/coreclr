@@ -232,6 +232,11 @@ private:
 
     typedef StateHolder<ThreadSuspend::SetSuspendRuntimeInProgress, ThreadSuspend::ResetSuspendRuntimeInProgress> SuspendRuntimeInProgressHolder;
 
+#ifdef RELIABLE_SUSPEND
+    void KeepThreadSuspended(Thread* thread);
+    void ResumeThreadFinal(Thread* thread);
+#endif
+
 public:
     static bool SysIsSuspendInProgress() { return s_fSuspendRuntimeInProgress; }
 
