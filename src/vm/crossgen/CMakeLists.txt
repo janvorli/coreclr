@@ -105,6 +105,7 @@ endif(FEATURE_READYTORUN)
 
 include_directories(BEFORE ..)
 include_directories(${CLR_DIR}/src/gc)
+include_directories(${CLR_DIR}/src/gc/env)
 
 if(CLR_CMAKE_PLATFORM_ARCH_AMD64)
   include_directories(../amd64)

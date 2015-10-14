@@ -288,6 +288,10 @@ namespace Loader
     } LoadFlag;
 }
 
+// src/gc/env
+#include "gcenv.interlocked.h"
+// src/vm
+#include "gcenv.interlocked.inl"
 
 // src/inc
 #include "utilcode.h"

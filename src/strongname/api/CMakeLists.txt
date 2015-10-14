@@ -7,6 +7,7 @@ include_directories(BEFORE ${VM_DIR})
 
 include_directories(${VM_DIR}/${ARCH_SOURCES_DIR})
 include_directories(${CLR_DIR}/src/md/compiler)
+include_directories(${CLR_DIR}/src/gc/env)
 
 add_definitions(-DSTRONGNAME_IN_VM -DSNAPI_INTERNAL)
 

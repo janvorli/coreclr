@@ -28,6 +28,7 @@
         $(ClrSrcDirectory)\strongname\inc;
         $(ClrSrcDirectory)\TraceLog;  
         $(ClrSrcDirectory)\gc
+        $(ClrSrcDirectory)\gc\env
     </UserIncludes>
 
     <UserAssemble386IncludePath>$(UserIncludes)</UserAssemble386IncludePath>

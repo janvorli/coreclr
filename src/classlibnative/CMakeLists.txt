@@ -13,6 +13,7 @@ else()
 endif()
 include_directories("../debug/inc")
 include_directories("../debug/inc/dump")
+include_directories(${CLR_DIR}/src/gc/env)
 
 if(CLR_CMAKE_PLATFORM_ARCH_AMD64)
   add_definitions(-DDBG_TARGET_64BIT=1)

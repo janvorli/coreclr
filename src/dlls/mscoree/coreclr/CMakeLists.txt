@@ -127,7 +127,7 @@ if(WIN32)
     # Add dac table & debug resource to coreclr
     get_include_directories(INC_DIR)
     get_compile_definitions(PREPROCESS_DEFINITIONS)
-    list(APPEND INC_DIR -I${CLR_DIR}/src/vm -I${CLR_DIR}/src/vm/${ARCH_SOURCES_DIR} -I${CLR_DIR}/src/debug/ee -I${CLR_DIR}/src/gc)
+    list(APPEND INC_DIR -I${CLR_DIR}/src/vm -I${CLR_DIR}/src/vm/${ARCH_SOURCES_DIR} -I${CLR_DIR}/src/debug/ee -I${CLR_DIR}/src/gc -I${CLR_DIR}/src/gc/env)
     list(APPEND PREPROCESS_DEFINITIONS -DDACCESS_COMPILE -DDBG_TARGET_64BIT=1 -DDBG_TARGET_WIN64=1)
 
 
@@ -177,4 +177,3 @@ install (TARGETS coreclr DESTINATION .)
 if(WIN32)
     install (FILES ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/coreclr.pdb DESTINATION PDB)
 endif(WIN32)
-
