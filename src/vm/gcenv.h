@@ -133,4 +133,63 @@ public:
     static Thread * GetThreadList(Thread * pThread);
 };
 
+#undef InitializeCriticalSection
+#undef DeleteCriticalSection
+#undef EnterCriticalSection
+#undef LeaveCriticalSection
+
+class GCToOSInterface
+{
+public:
+    static void Initialize();
+    static void Shutdown();
+
+    static void InitializeCriticalSection(CRITICAL_SECTION * lpCriticalSection);
+    static void DeleteCriticalSection(CRITICAL_SECTION * lpCriticalSection);
+    static void EnterCriticalSection(CRITICAL_SECTION * lpCriticalSection);
+    static void LeaveCriticalSection(CRITICAL_SECTION * lpCriticalSection);
+
+    static void* VirtualCommit(void* lpAddress, size_t dwSize);
+    static void* VirtualReserve(void* lpAddress, size_t dwSize, DWORD protect, size_t alignment, bool fWatch = false);
+    static void VirtualReset(void* lpAddress, size_t dwSize);
+    static bool VirtualDecommit(void* lpAddress, size_t dwSize);
+    static bool VirtualRelease(void* lpAddress, size_t dwSize);
+    static void ResetWriteWatch(void* lpAddress, size_t dwSize);
+
+    static void WriteLog(const char *fmt, va_list args);
+    static bool IsLogOpen();
+
+    static bool SwitchToThread(uint32_t dwSleepMSec, uint32_t dwSwitchCount);
+    static size_t GetCurrentThreadId();
+    static bool SetCurrentThreadIdealProcessor(int processorIndex, int groupIndex);
+    static void YieldProcessor();
+
+    static DWORD GetCurrentProcessorNumber();
+    static bool CanGetCurrentProcessorNumber();
+    static bool HasGetGetCurrentProcessorNumber();
+
+    static void FlushProcessWriteBuffers();
+
+    static void DebugBreak();
+    static size_t GetLargestOnDieCacheSize(BOOL bTrueSize = TRUE);
+    static DWORD GetLogicalCpuCount();
+
+    static bool GetCurrentProcessAffinityMask(DWORD_PTR* pmask, DWORD_PTR* smask);
+    static DWORD GetCurrentProcessCpuCount();
+    static void GetCurrentProcessMemoryLoad(LPMEMORYSTATUSEX ms);
+
+    static size_t GetHighResolutionTimeStamp();
+    static unsigned int GetLowResolutionTimeStamp();
+
+    static int32_t FastInterlockIncrement(int32_t volatile *lpAddend);
+    static int32_t FastInterlockDecrement(int32_t volatile *lpAddend);
+    static int32_t FastInterlockExchange(int32_t volatile *Target, int32_t Value);
+    static int32_t FastInterlockCompareExchange(int32_t volatile *Destination, int32_t Exchange, int32_t Comperand);
+    static int32_t FastInterlockExchangeAdd(int32_t volatile *Addend, int32_t Value);
+    static void* FastInterlockExchangePointer(void * volatile *Target, void * Value);
+    static void* FastInterlockCompareExchangePointer(void * volatile *Destination, void * Exchange, void * Comperand);
+    static void FastInterlockOr(uint32_t volatile *p, uint32_t msk);
+
+};
+
 #endif // GCENV_H_

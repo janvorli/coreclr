@@ -199,64 +199,51 @@ inline void FATAL_GC_ERROR()
 
 #define CLREvent CLREventStatic
 
-#ifdef CreateFileMapping
-
-#undef CreateFileMapping
-
-#endif //CreateFileMapping
-
-#define CreateFileMapping WszCreateFileMapping
-
 // hosted api
-#ifdef InitializeCriticalSection
-#undef InitializeCriticalSection
-#endif //ifdef InitializeCriticalSection
-#define InitializeCriticalSection UnsafeInitializeCriticalSection
+// #ifdef InitializeCriticalSection
+// #undef InitializeCriticalSection
+// #endif //ifdef InitializeCriticalSection
+// #define InitializeCriticalSection UnsafeInitializeCriticalSection
 
-#ifdef DeleteCriticalSection
-#undef DeleteCriticalSection
-#endif //ifdef DeleteCriticalSection
-#define DeleteCriticalSection UnsafeDeleteCriticalSection
+// #ifdef DeleteCriticalSection
+// #undef DeleteCriticalSection
+// #endif //ifdef DeleteCriticalSection
+// #define DeleteCriticalSection UnsafeDeleteCriticalSection
 
-#ifdef EnterCriticalSection
-#undef EnterCriticalSection
-#endif //ifdef EnterCriticalSection
-#define EnterCriticalSection UnsafeEEEnterCriticalSection
+// #ifdef EnterCriticalSection
+// #undef EnterCriticalSection
+// #endif //ifdef EnterCriticalSection
+// #define EnterCriticalSection UnsafeEEEnterCriticalSection
 
-#ifdef LeaveCriticalSection
-#undef LeaveCriticalSection
-#endif //ifdef LeaveCriticalSection
-#define LeaveCriticalSection UnsafeEELeaveCriticalSection
+// #ifdef LeaveCriticalSection
+// #undef LeaveCriticalSection
+// #endif //ifdef LeaveCriticalSection
+// #define LeaveCriticalSection UnsafeEELeaveCriticalSection
 
-#ifdef TryEnterCriticalSection
-#undef TryEnterCriticalSection
-#endif //ifdef TryEnterCriticalSection
-#define TryEnterCriticalSection UnsafeEETryEnterCriticalSection
-
-#ifdef CreateSemaphore
-#undef CreateSemaphore
-#endif //CreateSemaphore
-#define CreateSemaphore UnsafeCreateSemaphore
+// #ifdef CreateSemaphore
+// #undef CreateSemaphore
+// #endif //CreateSemaphore
+// #define CreateSemaphore UnsafeCreateSemaphore
 
 #ifdef CreateEvent
 #undef CreateEvent
 #endif //ifdef CreateEvent
 #define CreateEvent UnsafeCreateEvent
 
-#ifdef VirtualAlloc
-#undef VirtualAlloc
-#endif //ifdef VirtualAlloc
-#define VirtualAlloc ClrVirtualAlloc
+// #ifdef VirtualAlloc
+// #undef VirtualAlloc
+// #endif //ifdef VirtualAlloc
+// #define VirtualAlloc ClrVirtualAlloc
 
-#ifdef VirtualFree
-#undef VirtualFree
-#endif //ifdef VirtualFree
-#define VirtualFree ClrVirtualFree
+// #ifdef VirtualFree
+// #undef VirtualFree
+// #endif //ifdef VirtualFree
+// #define VirtualFree ClrVirtualFree
 
-#ifdef VirtualQuery
-#undef VirtualQuery
-#endif //ifdef VirtualQuery
-#define VirtualQuery ClrVirtualQuery
+// #ifdef VirtualQuery
+// #undef VirtualQuery
+// #endif //ifdef VirtualQuery
+// #define VirtualQuery ClrVirtualQuery
 
 #ifdef VirtualProtect
 #undef VirtualProtect
@@ -2465,8 +2452,6 @@ protected:
 
     PER_HEAP
     void save_ephemeral_generation_starts();
-
-    static size_t get_time_now();
 
     PER_HEAP
     bool init_dynamic_data ();

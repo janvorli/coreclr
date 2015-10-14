@@ -86,7 +86,7 @@ void SpinUntil(void *pCond, BOOL fNonZero)
 #endif //_DEBUG
 
             // sleep for a little while
-            __SwitchToThread(dwThisSleepPeriod, CALLER_LIMITS_SPINNING);
+            GCToOSInterface::SwitchToThread(dwThisSleepPeriod, CALLER_LIMITS_SPINNING);
 
             // now update our sleep period
             dwThisSleepPeriod = dwNextSleepPeriod;
@@ -98,7 +98,7 @@ void SpinUntil(void *pCond, BOOL fNonZero)
         else
         {
             // nope - just spin again
-            YieldProcessor();           // indicate to the processor that we are spining 
+            GCToOSInterface::YieldProcessor();           // indicate to the processor that we are spining 
             uNonSleepSpins--;
         }
     }

@@ -694,3 +694,385 @@ Thread * GCToEEInterface::GetThreadList(Thread * pThread)
     WRAPPER_NO_CONTRACT;
     return ThreadStore::GetThreadList(pThread);
 }
+
+static HANDLE gc_log = INVALID_HANDLE_VALUE;
+static size_t gc_log_file_size = 0;
+
+static size_t gc_buffer_index = 0;
+static size_t max_gc_buffers = 0;
+
+static MUTEX_COOKIE   gc_log_lock = 0;
+
+// we keep this much in a buffer and only flush when the buffer is full
+#define gc_log_buffer_size (1024*1024)
+static BYTE* gc_log_buffer = 0;
+static size_t gc_log_buffer_offset = 0;
+
+static LARGE_INTEGER performanceFrequency;
+
+void GCToOSInterface::Initialize()
+{
+    if (!QueryPerformanceFrequency(&performanceFrequency))
+    {
+        // FATAL ERROR
+    }
+
+#ifdef TRACE_GC
+    int log_last_gcs = CLRConfig::GetConfigValue(CLRConfig::UNSUPPORTED_GCLogEnabled);
+    if (log_last_gcs)
+    {
+        LPWSTR  temp_logfile_name = NULL;
+        CLRConfig::GetConfigValue(CLRConfig::UNSUPPORTED_GCLogFile, &temp_logfile_name);
+
+#ifdef FEATURE_REDHAWK
+        gc_log = PalCreateFileW(
+            temp_logfile_name,
+            GENERIC_WRITE,
+            FILE_SHARE_READ,
+            NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL);
+#else // FEATURE_REDHAWK
+        char logfile_name[MAX_LONGPATH+1];
+        if (temp_logfile_name != 0)
+        {
+            int ret;
+            ret = WszWideCharToMultiByte(CP_ACP, 0, temp_logfile_name, -1, logfile_name, sizeof(logfile_name)-1, NULL, NULL);
+            _ASSERTE(ret != 0);
+            delete temp_logfile_name;
+        }
+
+        char szPid[20];
+        sprintf_s(szPid, _countof(szPid), ".%d", GetCurrentProcessId());
+        strcat_s(logfile_name, _countof(logfile_name), szPid);
+        strcat_s(logfile_name, _countof(logfile_name), ".log");
+
+        gc_log = CreateFileA(
+            logfile_name,
+            GENERIC_WRITE,
+            FILE_SHARE_READ,
+            NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL);
+#endif // FEATURE_REDHAWK
+
+        if (gc_log == INVALID_HANDLE_VALUE)
+        {
+            return E_FAIL;
+        }
+
+        // GCLogFileSize in MBs.
+        gc_log_file_size = CLRConfig::GetConfigValue(CLRConfig::UNSUPPORTED_GCLogFileSize);
+
+        if (gc_log_file_size > 500)
+        {
+            CloseHandle (gc_log);
+            return E_FAIL;
+        }
+
+        gc_log_lock = ClrCreateMutex(NULL, FALSE, NULL);
+        gc_log_buffer = new (nothrow) BYTE [gc_log_buffer_size];
+        if (!gc_log_buffer)
+        {
+            return E_FAIL;
+        }
+        memset (gc_log_buffer, '*', gc_log_buffer_size);
+
+        max_gc_buffers = gc_log_file_size * 1024 * 1024 / gc_log_buffer_size;
+        //max_gc_buffers = gc_log_file_size * 1024 * 5/ gc_log_buffer_size;
+
+    }
+#endif // TRACE_GC
+}
+
+void GCToOSInterface::Shutdown()
+{
+
+}
+
+void GCToOSInterface::InitializeCriticalSection(CRITICAL_SECTION * lpCriticalSection)
+{
+    ::InitializeCriticalSection(lpCriticalSection);
+}
+
+void GCToOSInterface::DeleteCriticalSection(CRITICAL_SECTION * lpCriticalSection)
+{
+    ::DeleteCriticalSection(lpCriticalSection);
+}
+
+void GCToOSInterface::EnterCriticalSection(CRITICAL_SECTION * lpCriticalSection)
+{
+    ::EnterCriticalSection(lpCriticalSection);
+}
+
+void GCToOSInterface::LeaveCriticalSection(CRITICAL_SECTION * lpCriticalSection)
+{
+    ::LeaveCriticalSection(lpCriticalSection);
+}
+
+size_t GCToOSInterface::GetCurrentThreadId()
+{
+    return ::GetCurrentThreadId();
+}
+
+// GroupIndex == -1 represents no group (do we need that?)
+bool GCToOSInterface::SetCurrentThreadIdealProcessor(int processorIndex, int groupIndex)
+{
+    PORTABILITY_ASSERT("UNIXTODO: implement GCToOSInterface::SetCurrentThreadIdealProcessor");
+    return false;    
+//     bool success = true;
+// #if !defined(FEATURE_CORESYSTEM)
+//     SetThreadIdealProcessor(GetCurrentThread(), (DWORD)processorIndex);
+// #else
+//     PROCESSOR_NUMBER proc;
+
+//     if (groupIndex != -1)
+//     {
+//         proc.Group = (WORD)groupIndex;
+//         proc.Number = (BYTE)processorIndex;
+//         proc.Reserved = 0;
+        
+//         success = SetThreadIdealProcessorEx(GetCurrentThread(), &proc, NULL);
+//     }
+//     else
+//     {
+//         if (GetThreadIdealProcessorEx(GetCurrentThread(), &proc))
+//         {
+//             proc.Number = processorIndex;
+//             success = SetThreadIdealProcessorEx(GetCurrentThread(), &proc, NULL);
+//         }        
+//     }
+// #endif
+
+//    return success;
+}
+
+void GCToOSInterface::YieldProcessor()
+{
+    return ::YieldProcessor();
+}
+
+DWORD GCToOSInterface::GetCurrentProcessorNumber()
+{
+    return 0;
+}
+
+bool GCToOSInterface::CanGetCurrentProcessorNumber()
+{
+    return false;
+}
+
+void GCToOSInterface::FlushProcessWriteBuffers()
+{
+    ::FlushProcessWriteBuffers();
+}
+
+void GCToOSInterface::DebugBreak()
+{
+    ::DebugBreak();
+}
+
+DWORD GCToOSInterface::GetLogicalCpuCount()
+{
+    return ::GetLogicalCpuCount();
+}
+
+bool GCToOSInterface::SwitchToThread(uint32_t dwSleepMSec, uint32_t dwSwitchCount)
+{
+    return __SwitchToThread(dwSleepMSec, dwSwitchCount);
+}
+
+void GCToOSInterface::WriteLog(const char *fmt, va_list args)
+{
+    DWORD status = ClrWaitForMutex(gc_log_lock, INFINITE, FALSE);
+    assert (WAIT_OBJECT_0 == status);
+
+    const int BUFFERSIZE = 512;
+    static char rgchBuffer[BUFFERSIZE];
+    char *  pBuffer  = &rgchBuffer[0];
+
+    pBuffer[0] = '\r';
+    pBuffer[1] = '\n';
+    int buffer_start = 2;
+    int pid_len = sprintf_s (&pBuffer[buffer_start], BUFFERSIZE - buffer_start, "[%5d]", GetCurrentThreadId());
+    buffer_start += pid_len;
+    memset(&pBuffer[buffer_start], '-', BUFFERSIZE - buffer_start);
+    int msg_len = _vsnprintf(&pBuffer[buffer_start], BUFFERSIZE - buffer_start, fmt, args );
+    if (msg_len == -1)
+    {
+        msg_len = BUFFERSIZE - buffer_start;
+    }
+
+    msg_len += buffer_start;
+
+    if ((gc_log_buffer_offset + msg_len) > (gc_log_buffer_size - 12))
+    {
+        char index_str[8];
+        memset (index_str, '-', 8);
+        sprintf_s (index_str, _countof(index_str), "%d", (int)gc_buffer_index);
+        gc_log_buffer[gc_log_buffer_offset] = '\r';
+        gc_log_buffer[gc_log_buffer_offset + 1] = '\n';
+        memcpy (gc_log_buffer + (gc_log_buffer_offset + 2), index_str, 8);
+
+        gc_buffer_index++;
+        if (gc_buffer_index > max_gc_buffers)
+        {
+            SetFilePointer (gc_log, 0, NULL, FILE_BEGIN);
+            gc_buffer_index = 0;
+        }
+        DWORD written_to_log = 0;
+        WriteFile (gc_log, gc_log_buffer, (DWORD)gc_log_buffer_size, &written_to_log, NULL);
+        FlushFileBuffers (gc_log);
+        memset (gc_log_buffer, '*', gc_log_buffer_size);
+        gc_log_buffer_offset = 0;
+    }
+
+    memcpy (gc_log_buffer + gc_log_buffer_offset, pBuffer, msg_len);
+    gc_log_buffer_offset += msg_len;
+
+    status = ClrReleaseMutex(gc_log_lock);
+    assert (status);
+}
+
+bool GCToOSInterface::IsLogOpen()
+{
+    return false;
+}
+
+#undef VirtualAlloc
+#undef VirtualFree
+
+#define MEM_COMMIT              0x1000
+#define MEM_RESERVE             0x2000
+#define MEM_DECOMMIT            0x4000
+#define MEM_RELEASE             0x8000
+#define MEM_RESET               0x80000
+
+void GCToOSInterface::VirtualReset(void * lpAddress, size_t dwSize)
+{
+    ::VirtualAlloc(lpAddress, dwSize, MEM_RESET, PAGE_READWRITE);
+#ifndef FEATURE_PAL    
+    // Remove the page range from the working set
+    // TODO: the VirtualReset was called without the unlock from gc_heap::reset_heap_segment_pages.
+    // Do we need to preserve it?
+    ::VirtualUnlock(lpAddress, dwSize);
+#endif // FEATURE_PAL    
+}
+
+bool GCToOSInterface::VirtualDecommit(void* lpAddress, size_t dwSize)
+{
+    return ::VirtualFree(lpAddress, dwSize, MEM_DECOMMIT);
+}
+
+bool GCToOSInterface::VirtualRelease(void* lpAddress, size_t dwSize)
+{
+    // TODO: vesion for Unix would pass the dwSize
+    return ::VirtualFree(lpAddress, 0, MEM_RELEASE);
+}
+
+void* GCToOSInterface::VirtualReserve(void* lpAddress, size_t dwSize, DWORD protect, size_t alignment, bool fWatch)
+{
+    DWORD flags = (fWatch) ? (MEM_RESERVE | MEM_WRITE_WATCH) : MEM_RESERVE;
+    if (alignment == 0)
+    {
+        return ::VirtualAlloc(0, dwSize, flags, protect);
+    }
+    else
+    {
+        return ::ClrVirtualAllocAligned(0, dwSize, MEM_RESERVE, protect, alignment);    
+    }
+}
+
+void* GCToOSInterface::VirtualCommit(void* lpAddress, size_t dwSize)
+{
+    return ::VirtualAlloc(lpAddress, dwSize, MEM_COMMIT, PAGE_READWRITE);
+}
+
+void GCToOSInterface::ResetWriteWatch(void* lpAddress, size_t dwSize)
+{
+    ::ResetWriteWatch(lpAddress, dwSize);
+}
+
+size_t GCToOSInterface::GetLargestOnDieCacheSize(BOOL bTrueSize)
+{
+    return ::GetLargestOnDieCacheSize(bTrueSize);
+}
+
+bool GCToOSInterface::GetCurrentProcessAffinityMask(DWORD_PTR* pmask, DWORD_PTR* smask)
+{
+#if !defined(FEATURE_REDHAWK) && !defined(FEATURE_CORECLR)
+    return ::GetProcessAffinityMask(GetCurrentProcess(), pmask, smask);
+#endif
+    return false;
+}
+
+DWORD GCToOSInterface::GetCurrentProcessCpuCount()
+{
+    return ::GetCurrentProcessCpuCount();
+}
+
+void GCToOSInterface::GetCurrentProcessMemoryLoad(LPMEMORYSTATUSEX ms)
+{
+    ::GetProcessMemoryLoad(ms);
+}
+
+size_t GCToOSInterface::GetHighResolutionTimeStamp()
+{
+    LARGE_INTEGER ts;
+    if (!QueryPerformanceCounter(&ts))
+    {
+        // TODO: fatal error
+    }
+
+    return (size_t) (ts.QuadPart/(performanceFrequency.QuadPart/1000));
+}
+
+unsigned int GCToOSInterface::GetLowResolutionTimeStamp()
+{
+    return ::GetTickCount();
+}
+
+int32_t GCToOSInterface::FastInterlockIncrement(int32_t volatile *lpAddend)
+{
+    return ::FastInterlockIncrement(lpAddend);
+}
+
+int32_t GCToOSInterface::FastInterlockDecrement(int32_t volatile *lpAddend)
+{
+    return ::FastInterlockDecrement(lpAddend);
+}
+
+int32_t GCToOSInterface::FastInterlockExchange(int32_t volatile *Target, int32_t Value)
+{
+    return ::FastInterlockExchange(Target, Value);
+}
+
+int32_t GCToOSInterface::FastInterlockCompareExchange(int32_t volatile *Destination, int32_t Exchange, int32_t Comperand)
+{
+    return ::FastInterlockCompareExchange(Destination, Exchange, Comperand);
+}
+
+int32_t GCToOSInterface::FastInterlockExchangeAdd(int32_t volatile *Addend, int32_t Value)
+{
+    return ::FastInterlockExchangeAdd(Addend, Value);
+}
+
+void GCToOSInterface::FastInterlockOr(uint32_t volatile *p, uint32_t msk)
+{
+    ::FastInterlockOr(p, msk);
+}
+
+void * _FastInterlockExchangePointer(void * volatile *Target, void * Value);
+void * _FastInterlockCompareExchangePointer(void * volatile *Destination, void * Exchange, void * Comperand);
+
+void* GCToOSInterface::FastInterlockExchangePointer(void * volatile *Target, void * Value)
+{
+    return _FastInterlockExchangePointer(Target, Value);
+}
+
+void* GCToOSInterface::FastInterlockCompareExchangePointer(void * volatile *Destination, void * Exchange, void * Comperand)
+{
+    return _FastInterlockCompareExchangePointer(Destination, Exchange, Comperand);
+}

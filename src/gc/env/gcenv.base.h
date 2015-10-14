@@ -474,7 +474,7 @@ inline T FastInterlockExchangePointer(
     T volatile * target,
     T            value)
 {
-    return (T)_FastInterlockExchangePointer((void **)target, value);
+    return (T)GCToOSInterface::FastInterlockExchangePointer((void **)target, value);
 }
 
 template <typename T>
@@ -482,7 +482,7 @@ inline T FastInterlockExchangePointer(
     T volatile * target,
     nullptr_t    value)
 {
-    return (T)_FastInterlockExchangePointer((void **)target, value);
+    return (T)GCToOSInterface::FastInterlockExchangePointer((void **)target, value);
 }
 
 template <typename T>
@@ -491,7 +491,7 @@ inline T FastInterlockCompareExchangePointer(
     T            exchange,
     T            comparand)
 {
-    return (T)_FastInterlockCompareExchangePointer((void **)destination, exchange, comparand);
+    return (T)GCToOSInterface::FastInterlockCompareExchangePointer((void **)destination, exchange, comparand);
 }
 
 template <typename T>
@@ -500,7 +500,7 @@ inline T FastInterlockCompareExchangePointer(
     T            exchange,
     nullptr_t    comparand)
 {
-    return (T)_FastInterlockCompareExchangePointer((void **)destination, exchange, comparand);
+    return (T)GCToOSInterface::FastInterlockCompareExchangePointer((void **)destination, exchange, comparand);
 }
 
 

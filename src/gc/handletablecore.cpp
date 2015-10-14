@@ -524,7 +524,7 @@ BOOL SegmentInitialize(TableSegment *pSegment, HandleTable *pTable)
     dwCommit &= ~(g_SystemInfo.dwPageSize - 1);
 
     // commit the header
-    if (!ClrVirtualAlloc(pSegment, dwCommit, MEM_COMMIT, PAGE_READWRITE))
+    if (!GCToOSInterface::VirtualCommit(pSegment, dwCommit))
     {
         //_ASSERTE(FALSE);
         return FALSE;
@@ -579,7 +579,7 @@ void SegmentFree(TableSegment *pSegment)
     */
     
     // free the segment's memory
-    ClrVirtualFree(pSegment, 0, MEM_RELEASE);
+    GCToOSInterface::VirtualRelease(pSegment, HANDLE_SEGMENT_SIZE);
 }
 
 
@@ -609,7 +609,7 @@ TableSegment *SegmentAlloc(HandleTable *pTable)
     _ASSERTE(HANDLE_SEGMENT_ALIGNMENT >= HANDLE_SEGMENT_SIZE);
     _ASSERTE(HANDLE_SEGMENT_ALIGNMENT == 0x10000);
 
-    pSegment = (TableSegment *)ClrVirtualAllocAligned(NULL, HANDLE_SEGMENT_SIZE, MEM_RESERVE, PAGE_NOACCESS, HANDLE_SEGMENT_ALIGNMENT);
+    pSegment = (TableSegment *)GCToOSInterface::VirtualReserve(NULL, HANDLE_SEGMENT_SIZE, PAGE_NOACCESS, HANDLE_SEGMENT_ALIGNMENT);
     _ASSERTE(((size_t)pSegment % HANDLE_SEGMENT_ALIGNMENT) == 0);
     
     // bail out if we couldn't get any memory
@@ -1438,7 +1438,7 @@ UINT SegmentInsertBlockFromFreeListWorker(TableSegment *pSegment, UINT uType, BO
                 ULONG32 dwCommit = g_SystemInfo.dwPageSize;
 
                 // commit the memory
-                if (!ClrVirtualAlloc(pvCommit, dwCommit, MEM_COMMIT, PAGE_READWRITE))
+                if (!GCToOSInterface::VirtualCommit(pvCommit, dwCommit))
                     return BLOCK_INVALID;
 
                 // use the previous commit line as the new decommit line
@@ -1842,7 +1842,7 @@ void SegmentTrimExcessPages(TableSegment *pSegment)
         if (dwHi > dwLo)
         {
             // decommit the memory
-            ClrVirtualFree((LPVOID)dwLo, dwHi - dwLo, MEM_DECOMMIT);
+            GCToOSInterface::VirtualDecommit((LPVOID)dwLo, dwHi - dwLo);
 
             // update the commit line
             pSegment->bCommitLine = (BYTE)((dwLo - (size_t)pSegment->rgValue) / HANDLE_BYTES_PER_BLOCK);
