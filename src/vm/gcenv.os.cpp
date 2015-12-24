@@ -284,8 +284,8 @@ size_t GCToOSInterface::GetLargestOnDieCacheSize(bool trueSize)
 bool GCToOSInterface::GetCurrentProcessAffinityMask(uintptr_t* processMask, uintptr_t* systemMask)
 {
 #ifndef FEATURE_CORECLR
-    return ::GetProcessAffinityMask(GetCurrentProcess(), processMask, systemMask);
-#else    
+    return !!::GetProcessAffinityMask(GetCurrentProcess(), (PDWORD_PTR)processMask, (PDWORD_PTR)systemMask);
+#else
     return false;
 #endif
 }
@@ -404,21 +404,21 @@ bool GCToOSInterface::CreateThread(GCThreadFunction function, void* param, GCThr
     SetThreadPriority(gc_thread, /* THREAD_PRIORITY_ABOVE_NORMAL );*/ THREAD_PRIORITY_HIGHEST );
 
 #ifndef FEATURE_CORECLR
-    if (affinity.Group != -1) 
+    if (affinity->Group != -1)
     {
-        _ASSERTE(affinity.Processor != -1);
+        _ASSERTE(affinity->Processor != -1);
         GROUP_AFFINITY ga;
-        ga.Group  = affinity.Group;
+        ga.Group = (WORD)affinity->Group;
         ga.Reserved[0] = 0; // reserve must be filled with zero
         ga.Reserved[1] = 0; // otherwise call may fail
         ga.Reserved[2] = 0;
-        ga.Mask = 1 << affinity.Processor;
+        ga.Mask = 1 << affinity->Processor;
 
         CPUGroupInfo::SetThreadGroupAffinity(gc_thread, &ga, NULL);
     }
-    else if (affinity.Processor != -1)
+    else if (affinity->Processor != -1)
     {
-        SetThreadAffinityMask(gc_thread, 1 << affinity.Processor);
+        SetThreadAffinityMask(gc_thread, 1 << affinity->Processor);
     }
 #endif // !FEATURE_CORECLR
 
