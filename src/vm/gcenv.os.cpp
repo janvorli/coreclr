@@ -15,20 +15,11 @@
 #include "common.h"
 #include "gcenv.h"
 
-typedef uint32_t (WINAPI *GetCurrentProcessorNumber_t)(void);
-
-static GetCurrentProcessorNumber_t g_GetCurrentProcessorNumber = NULL;
-
 // Initialize the interface implementation
 // Return:
 //  true if it has succeeded, false if it has failed
 bool GCToOSInterface::Initialize()
 {
-#ifndef FEATURE_PAL
-    // on all Windows platforms we support this API exists.
-    g_GetCurrentProcessorNumber = (GetCurrentProcessorNumber_t)&GetCurrentProcessorNumber;
-#endif // !FEATURE_PAL
-
     return true;
 }
 
@@ -92,14 +83,19 @@ bool GCToOSInterface::SetCurrentThreadIdealAffinity(GCThreadAffinity* affinity)
 // Get the number of the current processor
 uint32_t GCToOSInterface::GetCurrentProcessorNumber()
 {
-    _ASSERTE(GCToOSInterface::CanGetCurrentProcessorNumber());
-    return g_GetCurrentProcessorNumber();
+    _ASSERTE(CanGetCurrentProcessorNumber());
+    return ::GetCurrentProcessorNumber();
 }
 
 // Check if the OS supports getting current processor number
 bool GCToOSInterface::CanGetCurrentProcessorNumber()
 {
-    return g_GetCurrentProcessorNumber != NULL;
+#ifdef FEATURE_PAL
+    return PAL_HasGetCurrentProcessorNumber();
+#else
+    // on all Windows platforms we support this API exists
+    return true;
+#endif
 }
 
 // Flush write buffers of processors that are executing threads of the current process
