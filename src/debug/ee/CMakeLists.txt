@@ -30,7 +30,6 @@ endif()
 include_directories(BEFORE ${VM_DIR})
 include_directories(BEFORE ${VM_DIR}/${ARCH_SOURCES_DIR})
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CLR_DIR}/src/gc/env)
 
 if(CLR_CMAKE_PLATFORM_UNIX)
   add_compile_options(-fPIC)

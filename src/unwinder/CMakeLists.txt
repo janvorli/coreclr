@@ -4,7 +4,6 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(BEFORE ${CLR_DIR}/src/unwinder)
 include_directories(${CLR_DIR}/src/debug/ee)
 include_directories(${CLR_DIR}/src/gc)
-include_directories(${CLR_DIR}/src/gc/env)
 include_directories(${CLR_DIR}/src/gcdump)
 include_directories(${CLR_DIR}/src/debug/daccess)
 

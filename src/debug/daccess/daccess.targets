@@ -25,7 +25,6 @@
         $(ClrSrcDirectory)\gcdump;
         $(ClrSrcDirectory)\md\inc;
         $(ClrSrcDirectory)\gc;
-        $(ClrSrcDirectory)\gc\env;
         $(ClrSrcDirectory)\strongname\inc</UserIncludes>
     <CDefines>$(CDefines);UNICODE;_UNICODE;$(USER_SPECIFIC_C_DEFINES);FEATURE_NO_HOST</CDefines>
     <OutputName Condition="'$(OutputName)' == ''">dac_wks</OutputName>

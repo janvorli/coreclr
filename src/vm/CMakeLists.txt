@@ -4,7 +4,6 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}) 
 
 include_directories(${CLR_DIR}/src/gc)
-include_directories(${CLR_DIR}/src/gc/env)
 
 if(CLR_CMAKE_PLATFORM_ARCH_AMD64)
     add_definitions(-D_TARGET_AMD64_=1)

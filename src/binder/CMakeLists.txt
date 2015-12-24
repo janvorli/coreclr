@@ -13,7 +13,6 @@ else()
 endif()
 include_directories(BEFORE "../vm")
 include_directories(BEFORE "inc")
-include_directories(${CLR_DIR}/src/gc/env)
       
 set(BINDER_COMMON_SOURCES
     variables.cpp
