@@ -4462,7 +4462,6 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
         // Check whether we are crossing managed-to-native boundary
         if (!ExecutionManager::IsManagedCode(GetIP(currentFrameContext)))
         {
-            // Return back to the UnwindManagedExceptionPass1 and let it unwind the native frames
             {
                 GCX_COOP();
                 // Pop all frames that are below the block of native frames and that would be
@@ -4479,6 +4478,8 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
                 ExceptionTracker* pTracker = GetThread()->GetExceptionState()->GetCurrentExceptionTracker();
                 pTracker->CleanupBeforeNativeFramesUnwind();
             }
+
+            // TODO: do we need to update the tracker's exception records now? We probably do.
 
             // Now we need to unwind the native frames until we reach managed frames again or the exception is
             // handled in the native code.
@@ -4689,6 +4690,14 @@ VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex)
                 CONTEXT frameContext;
                 RtlCaptureContext(&frameContext);
                 Thread::VirtualUnwindToFirstManagedCallFrame(&frameContext);
+
+                {
+                    GCX_COOP();
+                    // We also need to update the exception pointers in the current
+                    // exception tracker to point to the new ones, since it now points to a garbage
+                    ExceptionTracker* pTracker = GetThread()->GetExceptionState()->GetCurrentExceptionTracker();
+                    pTracker->SetExceptionPointers(ex.ExceptionPointers);
+                }
  
                 UnwindManagedExceptionPass2(ex, &frameContext);
             }

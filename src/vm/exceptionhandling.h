@@ -236,6 +236,12 @@ public:
         BOOL bAsynchronousThreadStop
         );
 
+    void SetExceptionPointers(EXCEPTION_POINTERS *pExceptionPointers)
+    {
+        m_ptrs.ExceptionRecord = pExceptionPointers->ExceptionRecord;
+        m_ptrs.ContextRecord = pExceptionPointers->ContextRecord;
+    }
+
     DWORD                   GetExceptionCode()      { return m_ExceptionCode;       }
     INDEBUG(inline  bool    IsValid());
     INDEBUG(static UINT_PTR DebugComputeNestingLevel());
