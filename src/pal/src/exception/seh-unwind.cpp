@@ -567,30 +567,29 @@ __attribute__((optnone))
 static void 
 RtlpRaiseException(EXCEPTION_RECORD *ExceptionRecord)
 {
+    ExceptionPointersStorage* exceptionPointers = (ExceptionPointersStorage*)malloc(sizeof(ExceptionPointersStorage));
+    new (exceptionPointers) ExceptionPointersStorage(ExceptionRecord);
+
+    if (exceptionPointers == NULL)
+    {
+        abort();
+    }
+
     // Capture the context of RtlpRaiseException.
-    CONTEXT ContextRecord;
-    ZeroMemory(&ContextRecord, sizeof(CONTEXT));
-    ContextRecord.ContextFlags = CONTEXT_FULL;
-    CONTEXT_CaptureContext(&ContextRecord);
+    ZeroMemory(&exceptionPointers->ContextRecord, sizeof(CONTEXT));
+    exceptionPointers->ContextRecord.ContextFlags = CONTEXT_FULL;
+    CONTEXT_CaptureContext(&exceptionPointers->ContextRecord);
 
     // Find the caller of RtlpRaiseException.  
-    PAL_VirtualUnwind(&ContextRecord, NULL);
+    PAL_VirtualUnwind(&exceptionPointers->ContextRecord, NULL);
 
     // The frame we're looking at now is RaiseException. We have to unwind one 
     // level further to get the actual context user code could be resumed at.
-    PAL_VirtualUnwind(&ContextRecord, NULL);
+    PAL_VirtualUnwind(&exceptionPointers->ContextRecord, NULL);
 
-#if defined(_X86_)
-    ExceptionRecord->ExceptionAddress = (void *) ContextRecord.Eip;
-#elif defined(_AMD64_)
-    ExceptionRecord->ExceptionAddress = (void *) ContextRecord.Rip;
-#elif defined(_ARM_) || defined(_ARM64_)
-    ExceptionRecord->ExceptionAddress = (void *) ContextRecord.Pc;
-#else
-#error unsupported architecture
-#endif
+    ExceptionRecord->ExceptionAddress = (void *)CONTEXTGetPC(&exceptionPointers->ContextRecord);
 
-    throw PAL_SEHException(ExceptionRecord, &ContextRecord);
+    throw PAL_SEHException(exceptionPointers);
 }
 
 /*++

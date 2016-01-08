@@ -4378,9 +4378,9 @@ bool IsSpInStackLimits(ULONG64 sp, ULONG64 stackLowAddress, ULONG64 stackHighAdd
 // This function is an assembler helper.
 //
 // Arguments:
-//      context - context at which to start the native unwinding
-//      ex      - pointer to the exception to use to unwind the native frames
-extern "C" void StartUnwindingNativeFrames(CONTEXT* context, PAL_SEHException* ex);
+//      context           - context at which to start the native unwinding
+//      exceptionPointers - pointer to the exception pointers of the exception to use to unwind the native frames
+extern "C" void StartUnwindingNativeFrames(CONTEXT* context, ExceptionPointersStorage* exceptionPointers);
 
 //---------------------------------------------------------------------------------------
 //
@@ -4409,7 +4409,7 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
     ULONG64 stackLowAddress = (ULONG64)PAL_GetStackLimit();
 
     // Indicate that we are performing second pass.
-    ex.ExceptionRecord.ExceptionFlags = EXCEPTION_UNWINDING;
+    ex.GetExceptionRecord()->ExceptionFlags = EXCEPTION_UNWINDING;
 
     currentFrameContext = unwindStartContext;
     callerFrameContext = &contextStorage;
@@ -4459,11 +4459,11 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
             if (establisherFrame == ex.TargetFrameSp)
             {
                 // We have reached the frame that will handle the exception.
-                ex.ExceptionRecord.ExceptionFlags |= EXCEPTION_TARGET_UNWIND;
+                ex.GetExceptionRecord()->ExceptionFlags |= EXCEPTION_TARGET_UNWIND;
             }
 
             // Perform unwinding of the current frame
-            disposition = ProcessCLRException(&ex.ExceptionRecord,
+            disposition = ProcessCLRException(ex.GetExceptionRecord(),
                 establisherFrame,
                 currentFrameContext,
                 &dispatcherContext);
@@ -4509,11 +4509,7 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
 
             // Now we need to unwind the native frames until we reach managed frames again or the exception is
             // handled in the native code.
-            // We need to make a copy of the exception off stack, since the "ex" is located in one of the stack
-            // frames that will become obsolete by the StartUnwindingNativeFrames and the ThrowExceptionHelper 
-            // could overwrite the "ex" object by stack e.g. when allocating the low level exception object for "throw".
-            static __thread BYTE threadLocalExceptionStorage[sizeof(PAL_SEHException)];
-            StartUnwindingNativeFrames(currentFrameContext, new (threadLocalExceptionStorage) PAL_SEHException(ex));
+            StartUnwindingNativeFrames(currentFrameContext, ex.ExceptionPointers);
             UNREACHABLE();
         }
 
@@ -4560,15 +4556,15 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex)
 
     unwindStartContext = frameContext;
 
-    if (!ExecutionManager::IsManagedCode(GetIP(&ex.ContextRecord)))
+    if (!ExecutionManager::IsManagedCode(GetIP(ex.GetContextRecord())))
     {
         // This is the first time we see the managed exception, set its context to the managed frame that has caused
         // the exception to be thrown
-        ex.ContextRecord = frameContext;
-        ex.ExceptionRecord.ExceptionAddress = (VOID*)controlPc;
+        ex.ExceptionPointers->ContextRecord = frameContext;
+        ex.GetExceptionRecord()->ExceptionAddress = (VOID*)controlPc;
     }
 
-    ex.ExceptionRecord.ExceptionFlags = 0;
+    ex.GetExceptionRecord()->ExceptionFlags = 0;
 
     memset(&dispatcherContext, 0, sizeof(DISPATCHER_CONTEXT));
     disposition = ExceptionContinueSearch;
@@ -4606,9 +4602,9 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex)
             dispatcherContext.ContextRecord = &frameContext;
 
             // Find exception handler in the current frame
-            disposition = ProcessCLRException(&ex.ExceptionRecord,
+            disposition = ProcessCLRException(ex.GetExceptionRecord(),
                 establisherFrame,
-                &ex.ContextRecord,
+                ex.GetContextRecord(),
                 &dispatcherContext);
 
             if (disposition == ExceptionContinueSearch)
@@ -4652,7 +4648,7 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex)
             {
                 if (!GetThread()->HasThreadStateNC(Thread::TSNC_ProcessedUnhandledException))
                 {
-                    LONG disposition = InternalUnhandledExceptionFilter_Worker(&ex.ExceptionPointers);
+                    LONG disposition = InternalUnhandledExceptionFilter_Worker(&ex.ExceptionPointers->ExceptionPointers);
                     _ASSERTE(disposition == EXCEPTION_CONTINUE_SEARCH);
                 }
                 TerminateProcess(GetCurrentProcess(), 1);
@@ -4694,9 +4690,9 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex)
 //      ex - the exception to throw.
 //
 extern "C"
-void ThrowExceptionHelper(PAL_SEHException* ex)
+void ThrowExceptionHelper(ExceptionPointersStorage* exceptionPointers)
 {
-    throw *ex;
+    throw PAL_SEHException(exceptionPointers);
 }
 
 VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex)
@@ -5061,11 +5057,11 @@ VOID PALAPI HandleHardwareException(PAL_SEHException* ex)
         return;
     }
 
-    if (ex->ExceptionRecord.ExceptionCode != STATUS_BREAKPOINT && ex->ExceptionRecord.ExceptionCode != STATUS_SINGLE_STEP)
+    if (ex->GetExceptionRecord()->ExceptionCode != STATUS_BREAKPOINT && ex->GetExceptionRecord()->ExceptionCode != STATUS_SINGLE_STEP)
     {
         // A hardware exception is handled only if it happened in a jitted code or 
         // in one of the JIT helper functions (JIT_MemSet, ...)
-        PCODE controlPc = GetIP(&ex->ContextRecord);
+        PCODE controlPc = GetIP(ex->GetContextRecord());
         if (ExecutionManager::IsManagedCode(controlPc) || IsIPInMarkedJitHelper(controlPc))
         {
             // Create frame necessary for the exception handling
@@ -5075,7 +5071,7 @@ VOID PALAPI HandleHardwareException(PAL_SEHException* ex)
 #endif // WIN64EXCEPTIONS
             {
                 GCX_COOP();     // Must be cooperative to modify frame chain.
-                CONTEXT context = ex->ContextRecord;
+                CONTEXT context = *ex->GetContextRecord();
                 if (IsIPInMarkedJitHelper(controlPc))
                 {
                     // For JIT helpers, we need to set the frame to point to the
@@ -5094,11 +5090,11 @@ VOID PALAPI HandleHardwareException(PAL_SEHException* ex)
             //
             // Thus, we will attempt to decode the instruction @ RIP to determine if that
             // is the case using the faulting context.
-            if ((ex->ExceptionRecord.ExceptionCode == EXCEPTION_INT_DIVIDE_BY_ZERO) &&
-                IsDivByZeroAnIntegerOverflow(&ex->ContextRecord))
+            if ((ex->GetExceptionRecord()->ExceptionCode == EXCEPTION_INT_DIVIDE_BY_ZERO) &&
+                IsDivByZeroAnIntegerOverflow(ex->GetContextRecord()))
             {
                 // The exception was an integer overflow, so augment the exception code.
-                ex->ExceptionRecord.ExceptionCode = EXCEPTION_INT_OVERFLOW;
+                ex->GetExceptionRecord()->ExceptionCode = EXCEPTION_INT_OVERFLOW;
             }
 #endif //_AMD64_
 
@@ -5112,20 +5108,20 @@ VOID PALAPI HandleHardwareException(PAL_SEHException* ex)
         Thread *pThread = GetThread();
         if (pThread != NULL && g_pDebugInterface != NULL)
         {
-            if (ex->ExceptionRecord.ExceptionCode == STATUS_BREAKPOINT)
+            if (ex->GetExceptionRecord()->ExceptionCode == STATUS_BREAKPOINT)
             {
                 // If this is breakpoint context, it is set up to point to an instruction after the break instruction.
                 // But debugger expects to see context that points to the break instruction, that's why we correct it.
-                SetIP(&ex->ContextRecord, GetIP(&ex->ContextRecord) - CORDbg_BREAK_INSTRUCTION_SIZE);
-                ex->ExceptionRecord.ExceptionAddress = (void *)GetIP(&ex->ContextRecord);
+                SetIP(ex->GetContextRecord(), GetIP(ex->GetContextRecord()) - CORDbg_BREAK_INSTRUCTION_SIZE);
+                ex->GetExceptionRecord()->ExceptionAddress = (void *)GetIP(ex->GetContextRecord());
             }
 
-            if (g_pDebugInterface->FirstChanceNativeException(&ex->ExceptionRecord,
-                &ex->ContextRecord,
-                ex->ExceptionRecord.ExceptionCode,
+            if (g_pDebugInterface->FirstChanceNativeException(ex->GetExceptionRecord(),
+                ex->GetContextRecord(),
+                ex->GetExceptionRecord()->ExceptionCode,
                 pThread))
             {
-                RtlRestoreContext(&ex->ContextRecord, &ex->ExceptionRecord);
+                RtlRestoreContext(ex->GetContextRecord(), ex->GetExceptionRecord());
             }
         }
     }

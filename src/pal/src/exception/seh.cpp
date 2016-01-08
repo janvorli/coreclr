@@ -133,6 +133,8 @@ PAL_SetHardwareExceptionHandler(
     g_hardwareExceptionHandler = exceptionHandler;
 }
 
+int ExceptionPointersStorage::Instances = 0;
+
 /*++
 Function:
     SEHProcessException
@@ -150,7 +152,11 @@ SEHProcessException(PEXCEPTION_POINTERS pointers)
 {
     if (!IsInDebugBreak(pointers->ExceptionRecord->ExceptionAddress))
     {
-        PAL_SEHException exception(pointers->ExceptionRecord, pointers->ContextRecord);
+        ExceptionPointersStorage* exceptionPointers = (ExceptionPointersStorage*)malloc(sizeof(ExceptionPointersStorage));
+        new (exceptionPointers) ExceptionPointersStorage(pointers->ExceptionRecord);
+
+        exceptionPointers->ContextRecord = *pointers->ContextRecord;
+        PAL_SEHException exception(exceptionPointers);
 
         if (g_hardwareExceptionHandler != NULL)
         {

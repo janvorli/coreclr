@@ -6684,6 +6684,42 @@ public:
 #define EXCEPTION_EXECUTE_HANDLER   1
 #define EXCEPTION_CONTINUE_EXECUTION -1
 
+struct ExceptionPointersStorage
+{
+    static int Instances;
+    int RefCount;
+    EXCEPTION_POINTERS ExceptionPointers;
+    EXCEPTION_RECORD ExceptionRecord;
+    CONTEXT ContextRecord;
+
+    ExceptionPointersStorage(EXCEPTION_RECORD* exceptionRecord)
+    : RefCount(1),
+      ExceptionRecord(*exceptionRecord)
+    {
+        Instances++;
+        printf("Created ExceptionPointersStorage at %p, refcount=%d, total instances=%d\n", this, RefCount, Instances);
+        ExceptionPointers.ExceptionRecord = &ExceptionRecord;
+        ExceptionPointers.ContextRecord = &ContextRecord;      
+    }
+
+    void AddRef()
+    {
+        RefCount++;
+        printf("AddRef ExceptionPointersStorage at %p, refcount=%d\n", this, RefCount);
+    }
+
+    void Release()
+    {
+        RefCount--;
+        printf("Release ExceptionPointersStorage at %p, refcount=%d\n", this, RefCount);
+        if (RefCount == 0)
+        {
+            Instances--;
+            free(this);
+        }
+    }
+};
+
 struct PAL_SEHException
 {
 private:
@@ -6693,28 +6729,50 @@ public:
     // instance - in contrast to Win32, where the exception record would usually
     // be allocated on the stack.  This is needed because foreign cleanup handlers
     // partially unwind the stack on the second pass.
-    EXCEPTION_POINTERS ExceptionPointers;
-    EXCEPTION_RECORD ExceptionRecord;
-    CONTEXT ContextRecord;
-    // Target frame stack pointer set before the 2nd pass.
-    SIZE_T TargetFrameSp;
+    // EXCEPTION_POINTERS ExceptionPointers;
+    // EXCEPTION_RECORD ExceptionRecord;
+    // CONTEXT ContextRecord;
 
-    PAL_SEHException(EXCEPTION_RECORD *pExceptionRecord, CONTEXT *pContextRecord)
-    {
-        ExceptionPointers.ExceptionRecord = &ExceptionRecord;
-        ExceptionPointers.ContextRecord = &ContextRecord;
-        ExceptionRecord = *pExceptionRecord;
-        ContextRecord = *pContextRecord;
-        TargetFrameSp = NoTargetFrameSp;
-    }
+    ExceptionPointersStorage* ExceptionPointers = nullptr;
+    // Target frame stack pointer set before the 2nd pass.
+    SIZE_T TargetFrameSp = NoTargetFrameSp;
+
+    // PAL_SEHException(EXCEPTION_RECORD *pExceptionRecord, CONTEXT *pContextRecord)
+    // {
+    //     ExceptionPointers.ExceptionRecord = &ExceptionRecord;
+    //     ExceptionPointers.ContextRecord = &ContextRecord;
+    //     ExceptionRecord = *pExceptionRecord;
+    //     ContextRecord = *pContextRecord;
+    //     TargetFrameSp = NoTargetFrameSp;
+    // }
 
     PAL_SEHException()
+    {
+    }    
+
+    PAL_SEHException(ExceptionPointersStorage* exceptionPointers)
+    : ExceptionPointers(exceptionPointers)
     {
     }    
 
     PAL_SEHException(const PAL_SEHException& ex)
     {
         *this = ex;
+    }    
+
+    PAL_SEHException(PAL_SEHException&& ex)
+    {
+        *this = ex;
+        ex.ExceptionPointers->Release();
+    }    
+
+    ~PAL_SEHException()
+    {
+        if (ExceptionPointers != nullptr)
+        {
+            ExceptionPointers->Release();
+            ExceptionPointers = nullptr;
+        }
     }    
 
     bool IsFirstPass()
@@ -6724,14 +6782,26 @@ public:
 
     PAL_SEHException& operator=(const PAL_SEHException& ex)
     {
-        ExceptionPointers.ExceptionRecord = &ExceptionRecord;
-        ExceptionPointers.ContextRecord = &ContextRecord;
-        ExceptionRecord = ex.ExceptionRecord;
-        ContextRecord = ex.ContextRecord;
+        if (ExceptionPointers != nullptr)
+        {
+            ExceptionPointers->Release();
+        }
+        ex.ExceptionPointers->AddRef();
+        ExceptionPointers = ex.ExceptionPointers;
         TargetFrameSp = ex.TargetFrameSp;
 
         return *this;
-    }    
+    }
+
+    EXCEPTION_RECORD* GetExceptionRecord()
+    {
+        return &ExceptionPointers->ExceptionRecord;
+    }
+
+    CONTEXT* GetContextRecord()
+    {
+        return &ExceptionPointers->ContextRecord;
+    }
 };
 
 typedef VOID (PALAPI *PHARDWARE_EXCEPTION_HANDLER)(PAL_SEHException* ex);
@@ -6906,7 +6976,7 @@ public:
 
 // Start of an exception handler. It works the same way as the PAL_EXCEPT except
 // that the disposition is obtained by calling the specified filter.
-#define PAL_EXCEPT_FILTER(filter) PAL_EXCEPT(filter(&ex.ExceptionPointers, __param))
+#define PAL_EXCEPT_FILTER(filter) PAL_EXCEPT(filter(&ex.ExceptionPointers->ExceptionPointers, __param))
 
 // Start of a finally block. The finally block is executed both when the try block
 // finishes or when an exception is raised using the RaiseException in it.
