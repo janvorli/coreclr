@@ -1289,6 +1289,9 @@ public:
 #ifdef FEATURE_COMINTEROP
         TSNC_WinRTInitialized           = 0x08000000, // the thread has initialized WinRT
 #endif // FEATURE_COMINTEROP
+#ifdef FEATURE_PAL
+        TSNC_NativeCallingManaged       = 0x08000000, // the thread is about to call managed code from native code
+#endif // FEATURE_PAL
 
         TSNC_ForceStackCommit           = 0x10000000, // Commit the whole stack, even if disableCommitThreadStack is set
 

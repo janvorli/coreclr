@@ -323,20 +323,29 @@ VOID DECLSPEC_NORETURN UnwindAndContinueRethrowHelperAfterCatch(Frame* pEntryFra
 VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex);
 
 #define INSTALL_MANAGED_EXCEPTION_DISPATCHER        \
+        { \
+        MAKE_CURRENT_THREAD_AVAILABLE();            \
         PAL_SEHException exCopy;                    \
         bool hasCaughtException = false;            \
+        bool rethrowException = CURRENT_THREAD->HasThreadStateNC(Thread::TSNC_NativeCallingManaged); \
+        CURRENT_THREAD->ResetThreadStateNC(Thread::TSNC_NativeCallingManaged); \
         try {
 
 #define UNINSTALL_MANAGED_EXCEPTION_DISPATCHER      \
         }                                           \
         catch (PAL_SEHException& ex)                \
         {                                           \
+            if (rethrowException)                   \
+            {                                       \
+                throw;                              \
+            }                                       \
             exCopy = ex;                            \
             hasCaughtException = true;              \
         }                                           \
         if (hasCaughtException)                     \
         {                                           \
             DispatchManagedException(exCopy);       \
+        } \
         }
 
 // Install trap that catches unhandled managed exception and dumps its stack

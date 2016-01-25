@@ -447,6 +447,12 @@ void FillInRegTypeMap(int argOffset, CorElementType typ, BYTE * pMap);
 /* Macros used to indicate a call to managed code is starting/ending   */
 /***********************************************************************/
 
+#ifdef FEATURE_PAL
+#define MARK_THREAD_AS_NATIVE_CALLING_MANAGED(thread) thread->SetThreadStateNC(Thread::TSNC_NativeCallingManaged)
+#else // FEATURE_PAL
+#define MARK_THREAD_AS_NATIVE_CALLING_MANAGED(thread)
+#endif // FEATURE_PAL
+
 enum EEToManagedCallFlags
 {
     EEToManagedDefault                  = 0x0000,
@@ -478,6 +484,7 @@ enum EEToManagedCallFlags
         }                                                                       \
     }                                                                           \
     BEGIN_SO_TOLERANT_CODE(CURRENT_THREAD);                                     \
+    MARK_THREAD_AS_NATIVE_CALLING_MANAGED(CURRENT_THREAD);                      \
     INSTALL_COMPLUS_EXCEPTION_HANDLER_NO_DECLARE();
 
 #define END_CALL_TO_MANAGED()                                                   \
