@@ -324,7 +324,10 @@ VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex);
 #define INSTALL_MANAGED_EXCEPTION_DISPATCHER        \
         PAL_SEHException exCopy;                    \
         bool hasCaughtException = false;            \
-        try {
+        try {                                       \
+            NativeExceptionHolderNoCatch __exceptionHolder;    \
+            __exceptionHolder.Push();                           
+
 
 #define UNINSTALL_MANAGED_EXCEPTION_DISPATCHER      \
         }                                           \

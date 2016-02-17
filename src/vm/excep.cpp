@@ -3861,6 +3861,15 @@ void UnwindFrameChain(Thread* pThread, LPVOID pvLimitSP)
     }
 }
 
+void UnwindFrameChainToNextExceptionHolder()
+{
+    GCX_COOP();
+    
+    void *nextExceptionHolder = NativeExceptionHolderBase::FindNextHolder(nullptr, nullptr, (void*)0x7FFFFFFFFFFFFFFF);
+    ASSERT(nextExceptionHolder != nullptr);
+    UnwindFrameChain(GetThread(), nextExceptionHolder);
+}
+
 BOOL IsExceptionOfType(RuntimeExceptionKind reKind, Exception *pException)
 {
     STATIC_CONTRACT_NOTHROW;

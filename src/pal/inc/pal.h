@@ -6904,6 +6904,13 @@ public:
     }
 };
 
+//#if defined(_BLD_CLR) && !defined(DACCESS_COMPILE)
+void UnwindFrameChainToNextExceptionHolder() __attribute__((weak));
+#define UNWIND_FRAME_CHAIN() if (UnwindFrameChainToNextExceptionHolder != NULL) UnwindFrameChainToNextExceptionHolder()
+//#else
+//#define UNWIND_FRAME_CHAIN()
+//#endif
+
 // Start of a try block for exceptions raised by RaiseException
 #define PAL_TRY(__ParamType, __paramDef, __paramRef)                            \
 {                                                                               \
@@ -6942,6 +6949,7 @@ public:
         }                                                                       \
         if (disposition == EXCEPTION_CONTINUE_SEARCH)                           \
         {                                                                       \
+            UNWIND_FRAME_CHAIN();                                               \
             throw;                                                              \
         }
 
@@ -6969,6 +6977,7 @@ public:
         catch (...)                     \
         {                               \
             finallyBlock();             \
+            UNWIND_FRAME_CHAIN();       \
             throw;                      \
         }                               \
         finallyBlock();                 \
