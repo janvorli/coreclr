@@ -149,6 +149,7 @@ void UnwindFrames(Thread *pThread, ThrowCallbackType *tct);
 #endif // !defined(WIN64EXCEPTIONS)
 
 void UnwindFrameChain(Thread *pThread, LPVOID pvLimitSP);
+void UnwindFrameChainToNextExceptionHolder();
 DWORD MapWin32FaultToCOMPlusException(EXCEPTION_RECORD *pExceptionRecord);
 DWORD ComputeEnclosingHandlerNestingLevel(IJitManager *pIJM, const METHODTOKEN& mdTok, SIZE_T offsNat);
 BOOL IsException(MethodTable *pMT);
