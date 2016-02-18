@@ -274,6 +274,8 @@ __declspec(thread)
 #endif // !__llvm__
 static NativeExceptionHolderBase *t_nativeExceptionHolderHead = nullptr;
 
+static void (*NativeExceptionHolderBase::s_stackCleanupCallback)(void* sp) = nullptr;
+
 NativeExceptionHolderBase::NativeExceptionHolderBase()
 {
     m_head = nullptr;
@@ -289,6 +291,11 @@ NativeExceptionHolderBase::~NativeExceptionHolderBase()
         m_head = nullptr;
         m_next = nullptr;
     }
+
+    if (s_stackCleanupCallback != nullptr)
+    {
+        s_stackCleanupCallback(this);
+    }   
 }
 
 void 
@@ -316,6 +323,12 @@ NativeExceptionHolderBase::FindNextHolder(NativeExceptionHolderBase *currentHold
     }
 
     return nullptr;
+}
+
+void
+NativeExceptionHolderBase::RegisterStackCleanupCallback(void (*callback)(void* sp))
+{
+    s_stackCleanupCallback = callback;
 }
 
 #include "seh-unwind.cpp"

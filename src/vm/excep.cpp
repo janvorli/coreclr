@@ -3861,16 +3861,12 @@ void UnwindFrameChain(Thread* pThread, LPVOID pvLimitSP)
     }
 }
 
-#ifdef FEATURE_PAL
-void UnwindFrameChainToNextExceptionHolder()
+void UnwindCurrentThreadFrameChain(LPVOID pvLimitSP)
 {
-    GCX_COOP();
-    
-    void *nextExceptionHolder = NativeExceptionHolderBase::FindNextHolder(nullptr, nullptr, (void*)0x7FFFFFFFFFFFFFFF);
-    ASSERT(nextExceptionHolder != nullptr);
-    UnwindFrameChain(GetThread(), nextExceptionHolder);
+    WRAPPER_NO_CONTRACT;
+
+    UnwindFrameChain(GetThread(), pvLimitSP);
 }
-#endif
 
 BOOL IsExceptionOfType(RuntimeExceptionKind reKind, Exception *pException)
 {

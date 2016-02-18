@@ -1441,6 +1441,10 @@ HRESULT EEStartup(COINITIEE fFlags)
 
     _ASSERTE(!g_fEEStarted && !g_fEEInit && SUCCEEDED (g_EEStartupStatus));
 
+#ifdef FEATURE_PAL
+    NativeExceptionHolderBase::RegisterStackCleanupCallback(UnwindCurrentThreadFrameChain);
+#endif
+   
     PAL_TRY(COINITIEE *, pfFlags, &fFlags)
     {
 #ifndef CROSSGEN_COMPILE

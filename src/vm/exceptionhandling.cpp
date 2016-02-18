@@ -4450,12 +4450,12 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
             // Return back to the UnwindManagedExceptionPass1 and let it unwind the native frames
             {
                 GCX_COOP();
+                
+                // TODO: seems like this is not needed anymore
                 // Pop all frames that are below the block of native frames and that would be
                 // in the unwound part of the stack when UnwindManagedExceptionPass2 is resumed 
                 // at the next managed frame.
-                void *nextExceptionHolder = NativeExceptionHolderBase::FindNextHolder(nullptr, nullptr, (void*)0x7FFFFFFFFFFFFFFF);
-                ASSERT(nextExceptionHolder != nullptr);
-                UnwindFrameChain(GetThread(), nextExceptionHolder);
+                UnwindFrameChain(GetThread(), (VOID*)GetSP(currentFrameContext));
 
                 // We are going to reclaim the stack range that was scanned by the exception tracker
                 // until now. We need to reset the explicit frames range so that if GC fires before
@@ -4655,8 +4655,6 @@ void ThrowExceptionHelper(PAL_SEHException* ex)
 
 VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex)
 {
-    void *nextExceptionHolder;
-
     do
     {
         try
@@ -4671,8 +4669,7 @@ VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex)
             // Check if there is any exception holder in the skipped frames. If there is one, we need to unwind them
             // using the C++ handling. This is a special case when the UNINSTALL_MANAGED_EXCEPTION_DISPATCHER was
             // not at the managed to native boundary.
-            nextExceptionHolder = NativeExceptionHolderBase::FindNextHolder(nullptr, (void*)currentSP, (void*)firstManagedFrameSP);
-            if (nextExceptionHolder != nullptr)
+            if (NativeExceptionHolderBase::FindNextHolder(nullptr, (void*)currentSP, (void*)firstManagedFrameSP) != nullptr)
             {
                 break;
             }
@@ -4718,13 +4715,6 @@ VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex)
 
             pCurTES->SetLastActiveExceptionCorruptionSeverity(severity);
         }
-    }
-
-    {
-        GCX_COOP();
-        // Pop all frames that are below the next exception holder, since the throw below
-        // will unwind the stack that contains them.
-        UnwindFrameChain(GetThread(), nextExceptionHolder);
     }
 
     throw ex;

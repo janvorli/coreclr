@@ -6805,6 +6805,8 @@ extern "C++" {
 //
 class NativeExceptionHolderBase
 {
+    static void (*s_stackCleanupCallback)(void* sp);
+
     // Save the address of the holder head so the destructor 
     // doesn't have access the slow (on Linux) TLS value again.
     NativeExceptionHolderBase **m_head;
@@ -6904,13 +6906,6 @@ public:
     }
 };
 
-//#if defined(_BLD_CLR) && !defined(DACCESS_COMPILE)
-void UnwindFrameChainToNextExceptionHolder() __attribute__((weak));
-#define UNWIND_FRAME_CHAIN() if (UnwindFrameChainToNextExceptionHolder != NULL) UnwindFrameChainToNextExceptionHolder()
-//#else
-//#define UNWIND_FRAME_CHAIN()
-//#endif
-
 // Start of a try block for exceptions raised by RaiseException
 #define PAL_TRY(__ParamType, __paramDef, __paramRef)                            \
 {                                                                               \
@@ -6949,7 +6944,6 @@ void UnwindFrameChainToNextExceptionHolder() __attribute__((weak));
         }                                                                       \
         if (disposition == EXCEPTION_CONTINUE_SEARCH)                           \
         {                                                                       \
-            UNWIND_FRAME_CHAIN();                                               \
             throw;                                                              \
         }
 
@@ -6977,7 +6971,6 @@ void UnwindFrameChainToNextExceptionHolder() __attribute__((weak));
         catch (...)                     \
         {                               \
             finallyBlock();             \
-            UNWIND_FRAME_CHAIN();       \
             throw;                      \
         }                               \
         finallyBlock();                 \
