@@ -3847,10 +3847,18 @@ public:
     BOOL IsAddressInStack (PTR_VOID addr) const
     {
         LIMITED_METHOD_DAC_CONTRACT; 
+
+// TODO: add extra feature for the dynamic checks?
+#if defined(FEATURE_PAL) && !defined(DACCESS_COMPILE)
+        PTR_VOID limit = PAL_GetStackLimit(m_ThreadHandle);
+#else // FEATURE_PAL && !DACCESS_COMPILE
+        PTR_VOID limit = m_CacheStackLimit;
+#endif // FEATURE_PAL && !DACCESS_COMPILE
+
+        _ASSERTE(limit != NULL);
         _ASSERTE(m_CacheStackBase != NULL);
-        _ASSERTE(m_CacheStackLimit != NULL);
-        _ASSERTE(m_CacheStackLimit < m_CacheStackBase);
-        return m_CacheStackLimit < addr && addr <= m_CacheStackBase;
+        _ASSERTE(limit < m_CacheStackBase);
+        return limit < addr && addr <= m_CacheStackBase;
     }
 
     static BOOL IsAddressInCurrentStack (PTR_VOID addr)

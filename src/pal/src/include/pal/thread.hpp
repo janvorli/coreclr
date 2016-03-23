@@ -652,34 +652,18 @@ namespace CorUnix
             void
             );
 
-        // Get base address of the current thread's stack
-        static
+        // Get base address of the thread's stack
         void *
         GetStackBase(
             void
             );
 
-        // Get cached base address of this thread's stack
-        // Can be called only for the current thread.
-        void *
-        GetCachedStackBase(
-            void
-            );
-
-        // Get limit address of the current thread's stack
-        static
+        // Get limit address of the thread's stack
         void *
         GetStackLimit(
             void
             );
 
-        // Get cached limit address of this thread's stack
-        // Can be called only for the current thread.
-        void *
-        GetCachedStackLimit(
-            void
-            );
-        
 #ifdef FEATURE_PAL_SXS
         //
         // Functions for PAL side-by-side support

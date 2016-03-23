@@ -3245,12 +3245,12 @@ TlsFree(
 PALIMPORT
 void *
 PALAPI
-PAL_GetStackBase();
+PAL_GetStackBase(IN HANDLE hThread);
 
 PALIMPORT
 void *
 PALAPI
-PAL_GetStackLimit();
+PAL_GetStackLimit(IN HANDLE hThread);
 
 PALIMPORT
 DWORD

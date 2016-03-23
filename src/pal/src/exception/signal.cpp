@@ -308,7 +308,7 @@ static void sigsegv_handler(int code, siginfo_t *siginfo, void *context)
         {
             // Check if the failed access has hit a stack guard page. In such case, it
             // was a stack probe that detected that there is not enough stack left.
-            void* stackLimit = CPalThread::GetStackLimit();
+            void* stackLimit = GetCurrentPalThread()->GetStackLimit();
             void* stackGuard = (void*)((size_t)stackLimit - getpagesize());
             if ((siginfo->si_addr >= stackGuard) && (siginfo->si_addr < stackLimit))
             {

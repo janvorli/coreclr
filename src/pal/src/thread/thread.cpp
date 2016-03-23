@@ -2535,22 +2535,20 @@ CPalThread::GetStackBase()
     void* stackBase;
 #ifdef _TARGET_MAC64
     // This is a Mac specific method
-    stackBase = pthread_get_stackaddr_np(pthread_self());
+    stackBase = pthread_get_stackaddr_np(m_pthreadSelf);
 #else
     pthread_attr_t attr;
     void* stackAddr;
     size_t stackSize;
     int status;
 
-    pthread_t thread = pthread_self();
-
     status = pthread_attr_init(&attr);
     _ASSERT_MSG(status == 0, "pthread_attr_init call failed");
 
 #if HAVE_PTHREAD_ATTR_GET_NP
-    status = pthread_attr_get_np(thread, &attr);
+    status = pthread_attr_get_np(m_pthreadSelf, &attr);
 #elif HAVE_PTHREAD_GETATTR_NP
-    status = pthread_getattr_np(thread, &attr);
+    status = pthread_getattr_np(m_pthreadSelf, &attr);
 #else
 #error Dont know how to get thread attributes on this platform!
 #endif
@@ -2582,15 +2580,13 @@ CPalThread::GetStackLimit()
     size_t stackSize;
     int status;
 
-    pthread_t thread = pthread_self();
-
     status = pthread_attr_init(&attr);
     _ASSERT_MSG(status == 0, "pthread_attr_init call failed");
 
 #if HAVE_PTHREAD_ATTR_GET_NP
-    status = pthread_attr_get_np(thread, &attr);
+    status = pthread_attr_get_np(m_pthreadSelf, &attr);
 #elif HAVE_PTHREAD_GETATTR_NP
-    status = pthread_getattr_np(thread, &attr);
+    status = pthread_getattr_np(m_pthreadSelf, &attr);
 #else
 #error Dont know how to get thread attributes on this platform!
 #endif
@@ -2606,50 +2602,88 @@ CPalThread::GetStackLimit()
     return stackLimit;
 }
 
-// Get cached base address of this thread's stack
-// Can be called only for the current thread.
 void *
-CPalThread::GetCachedStackBase()
+PALAPI
+PAL_GetStackBase(IN HANDLE hThread)
 {
-    _ASSERT_MSG(this == InternalGetCurrentThread(), "CPalThread::GetStackBase called from foreign thread");
+    PERF_ENTRY(PAL_GetStackBase);
+    ENTRY("PAL_GetStackBase(hThread=%p)\n", hThread);
 
-    if (m_stackBase == NULL)
+    CPalThread *pCurrentThread;
+    CPalThread *pTargetThread;
+    IPalObject *pobjThread = NULL;
+    void* base = NULL;
+
+    pCurrentThread = InternalGetCurrentThread();
+
+    PAL_ERROR palError = InternalGetThreadDataFromHandle(
+        pCurrentThread,
+        hThread,
+        0,
+        &pTargetThread,
+        &pobjThread
+        );
+
+    if (palError == NO_ERROR)
     {
-        m_stackBase = GetStackBase();
+        base = pTargetThread->GetStackBase();
+    }
+    else
+    {
+        pCurrentThread->SetLastError(palError);
     }
 
-    return m_stackBase;
-}
-
-// Get cached limit address of this thread's stack.
-// Can be called only for the current thread.
-void *
-CPalThread::GetCachedStackLimit()
-{
-    _ASSERT_MSG(this == InternalGetCurrentThread(), "CPalThread::GetCachedStackLimit called from foreign thread");
-
-    if (m_stackLimit == NULL)
+    if (pobjThread != NULL)
     {
-        m_stackLimit = GetStackLimit();
+        pobjThread->ReleaseReference(pCurrentThread);
     }
 
-    return m_stackLimit;
+    LOGEXIT("PAL_GetStackBase returns:d\n", (palError == NO_ERROR));
+    PERF_EXIT(PAL_GetStackBase);
+
+    return base;
 }
 
 void *
 PALAPI
-PAL_GetStackBase()
+PAL_GetStackLimit(IN HANDLE hThread)
 {
-    CPalThread* thread = InternalGetCurrentThread();
-    return thread->GetCachedStackBase();
-}
+    PERF_ENTRY(PAL_GetStackLimit);
+    ENTRY("PAL_GetStackLimit(hThread=%p)\n", hThread);
 
-void *
-PALAPI
-PAL_GetStackLimit()
-{
-    CPalThread* thread = InternalGetCurrentThread();
-    return thread->GetCachedStackLimit();
+    CPalThread *pCurrentThread;
+    CPalThread *pTargetThread;
+    IPalObject *pobjThread = NULL;
+    void* limit = NULL;
+
+    pCurrentThread = InternalGetCurrentThread();
+
+    PAL_ERROR palError = InternalGetThreadDataFromHandle(
+        pCurrentThread,
+        hThread,
+        0,
+        &pTargetThread,
+        &pobjThread
+        );
+
+    if (palError == NO_ERROR)
+    {
+        limit = pTargetThread->GetStackLimit();
+    }
+    else
+    {
+        pCurrentThread->SetLastError(palError);
+    }
+
+    if (pobjThread != NULL)
+    {
+        pobjThread->ReleaseReference(pCurrentThread);
+    }
+
+    LOGEXIT("PAL_GetStackLimit returns:d\n", (palError == NO_ERROR));
+    PERF_EXIT(PAL_GetStackLimit);
+
+    return limit;
 }
 
 PAL_ERROR InjectActivationInternal(CorUnix::CPalThread* pThread);

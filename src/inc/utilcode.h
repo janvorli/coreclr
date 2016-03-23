@@ -4639,12 +4639,12 @@ public:
 
     static void* GetStackBase()
     {
-        return PAL_GetStackBase();
+        return PAL_GetStackBase(GetCurrentThread());
     }
 
     static void* GetStackLimit()
     {
-        return PAL_GetStackLimit();
+        return PAL_GetStackLimit(GetCurrentThread());
     }
 
 #else // !FEATURE_PAL

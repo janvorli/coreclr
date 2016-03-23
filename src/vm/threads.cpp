@@ -7271,7 +7271,7 @@ void * Thread::GetStackLowerBound()
         return NULL;
     }
 #else // !FEATURE_PAL
-    return PAL_GetStackLimit();
+    return PAL_GetStackLimit(GetCurrentThread());
 #endif // !FEATURE_PAL
 }
 
@@ -8239,8 +8239,7 @@ void CheckRegDisplaySP (REGDISPLAY *pRD)
 {
     if (pRD->SP && pRD->_pThread)
     {
-        _ASSERTE(PTR_VOID(pRD->SP) >= pRD->_pThread->GetCachedStackLimit());
-        _ASSERTE(PTR_VOID(pRD->SP) <  pRD->_pThread->GetCachedStackBase());
+        _ASSERTE(pRD->_pThread->IsAddressInStack(PTR_VOID(pRD->SP)));
     }
 }
 
