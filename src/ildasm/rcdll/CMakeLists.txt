@@ -22,6 +22,6 @@ target_link_libraries(ildasmrc
 )
 
 # We will generate PDB only for the debug configuration
-install (FILES ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/ildasmrc.pdb DESTINATION PDB)
+#install (FILES ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/ildasmrc.pdb DESTINATION PDB)
 
-install (TARGETS ildasmrc DESTINATION .)
+install_clr (ildasmrc)
