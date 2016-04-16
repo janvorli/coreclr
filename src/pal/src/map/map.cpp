@@ -2574,14 +2574,58 @@ void * MAPMapPEFile(HANDLE hFile)
         if (currentHeader.Characteristics & IMAGE_SCN_MEM_WRITE)
             prot |= PROT_WRITE;
 
+        int sectionMapFd = fd;
+        int sectionMapFlags = MAP_PRIVATE | MAP_FIXED;
+        LPVOID tempMapAddress = NULL;
+        bool isSectionRWX = (prot & PROT_READ) && (prot & PROT_WRITE) && (prot & PROT_EXEC);
+        if (isSectionRWX)
+        {
+            // If the section is mapped as RWX, we cannot map it directly from the file, since it
+            // would fail on SELinux later on. So we create a read only mapping from the file,
+            // then create an anonymous mapping with the RWX attributes and copy the section
+            // contents from the first mapping to the second one. Finally we unmap the read only
+            // mapping from the file and keep just the anonymous one.
+
+            tempMapAddress = mmap(
+                NULL,
+                currentHeader.SizeOfRawData,
+                PROT_READ,
+                MAP_FILE|MAP_PRIVATE,
+                fd, currentHeader.PointerToRawData);
+
+            if (MAP_FAILED == tempMapAddress)
+            {
+                ERROR_(LOADER)( "mmap of section %d for copying failed\n", i );
+                goto doneReleaseMappingCriticalSection;
+            }
+            sectionMapFd = -1;
+            sectionMapFlags |= MAP_ANONYMOUS;
+        }
+
         palError = MAPmmapAndRecord(pFileObject, loadedBase,
-                        sectionBase,
-                        currentHeader.SizeOfRawData,
-                        prot,
-                        MAP_FILE|MAP_PRIVATE|MAP_FIXED,
-                        fd,
-                        currentHeader.PointerToRawData,
-                        &sectionData);
+            sectionBase,
+            currentHeader.SizeOfRawData,
+            prot,
+            sectionMapFlags,
+            sectionMapFd,
+            currentHeader.PointerToRawData,
+            &sectionData);
+
+        if (isSectionRWX)
+        {
+            if (NO_ERROR == palError)
+            {
+                // Copy
+                memcpy(sectionBase, tempMapAddress, currentHeader.SizeOfRawData);
+            }
+
+            if (munmap(tempMapAddress, currentHeader.SizeOfRawData) == -1)
+            {
+                ERROR_(LOADER)( "munmap of section %d failed\n", i );
+                goto doneReleaseMappingCriticalSection;
+            }
+        }
+        
         if (NO_ERROR != palError)
         {
             ERROR_(LOADER)( "mmap of section %d failed\n", i );
