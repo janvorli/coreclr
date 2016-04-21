@@ -93,6 +93,38 @@ PEImageLayout* PEImageLayout::Map(HANDLE hFile, PEImage* pOwner)
 }
 
 #ifdef FEATURE_PREJIT
+
+DWORD SectionCharacteristicsToPageProtection(USHORT characteristics)
+{
+    _ASSERTE((characteristics & VAL32(IMAGE_SCN_MEM_READ)) != 0);
+    DWORD pageProtection;
+
+    if ((characteristics & VAL32(IMAGE_SCN_MEM_WRITE)) != 0)
+    {
+        if ((characteristics & VAL32(IMAGE_SCN_MEM_EXECUTE)) != 0)
+        {
+            pageProtection = PAGE_EXECUTE_READWRITE;
+        }
+        else
+        {
+            pageProtection = PAGE_READWRITE;
+        }
+    }
+    else
+    {
+        if ((characteristics & VAL32(IMAGE_SCN_MEM_EXECUTE)) != 0)
+        {
+            pageProtection = PAGE_EXECUTE_READ;
+        }
+        else
+        {
+            pageProtection = PAGE_READONLY;
+        }
+    }
+
+    return pageProtection;
+}
+
 //To force base relocation on Vista (which uses ASLR), unmask IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
 //(0x40) for OptionalHeader.DllCharacteristics
 void PEImageLayout::ApplyBaseRelocations()
@@ -157,6 +189,8 @@ void PEImageLayout::ApplyBaseRelocations()
                 if (!ClrVirtualProtect(pWriteableRegion, cbWriteableRegion,
                                        PAGE_READWRITE, &dwOldProtection))
                     ThrowLastError();
+
+                dwOldProtection = SectionCharacteristicsToPageProtection(pSection->Characteristics);
             }
         }
 
