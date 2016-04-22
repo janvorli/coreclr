@@ -83,6 +83,7 @@ MAPRecordMapping(
     IPalObject *pMappingObject,
     void *pPEBaseAddress,
     void *addr,
+    void *writeableAddr,
     size_t len,
     int prot
     );
@@ -2179,6 +2180,158 @@ static LONG NativeMapHolderRelease(CPalThread *pThread, NativeMapHolder * thisNM
 
 #endif // ONE_SHARED_MAPPING_PER_FILEREGION_PER_PROCESS
 
+BOOL
+PALAPI
+PAL_GetWriteablePESectionMapping(
+    IN LPVOID lpAddress,
+    OUT LPVOID* lpWriteableAddress)
+{
+    BOOL fFound = FALSE;
+    CPalThread * pThread = InternalGetCurrentThread();
+
+    InternalEnterCriticalSection(pThread, &mapping_critsec);
+
+    for(LIST_ENTRY *pLink = MappedViewList.Flink;
+        pLink != &MappedViewList;
+        pLink = pLink->Flink)
+    {
+        UINT MappedSize;
+        VOID * real_map_addr;
+        SIZE_T real_map_sz;
+        PMAPPED_VIEW_LIST pView = CONTAINING_RECORD(pLink, MAPPED_VIEW_LIST, Link);
+
+#if ONE_SHARED_MAPPING_PER_FILEREGION_PER_PROCESS
+        real_map_addr = pView->pNMHolder->address;
+        real_map_sz = pView->pNMHolder->size;
+#else
+        real_map_addr = pView->lpAddress;
+        real_map_sz = pView->NumberOfBytesToMap;
+#endif
+
+        MappedSize = ((real_map_sz-1) & ~VIRTUAL_PAGE_MASK) + VIRTUAL_PAGE_SIZE;
+        if ( real_map_addr <= lpAddress &&
+             (VOID *)((UINT_PTR)real_map_addr+MappedSize) > lpAddress )
+        {
+            *lpWriteableAddress = pView->lpWriteableAddress;
+            fFound = TRUE;
+            break;
+        }
+    }
+
+    InternalLeaveCriticalSection(pThread, &mapping_critsec);
+
+    return fFound;
+}
+
+BOOL
+PALAPI
+PAL_RemoveWriteablePESectionMapping(
+    IN LPVOID lpAddress)
+{
+    BOOL fFound = FALSE;
+    CPalThread * pThread = InternalGetCurrentThread();
+
+    InternalEnterCriticalSection(pThread, &mapping_critsec);
+
+    for(LIST_ENTRY *pLink = MappedViewList.Flink;
+        pLink != &MappedViewList;
+        pLink = pLink->Flink)
+    {
+        UINT MappedSize;
+        VOID * real_map_addr;
+        SIZE_T real_map_sz;
+        PMAPPED_VIEW_LIST pView = CONTAINING_RECORD(pLink, MAPPED_VIEW_LIST, Link);
+
+#if ONE_SHARED_MAPPING_PER_FILEREGION_PER_PROCESS
+        real_map_addr = pView->pNMHolder->address;
+        real_map_sz = pView->pNMHolder->size;
+#else
+        real_map_addr = pView->lpAddress;
+        real_map_sz = pView->NumberOfBytesToMap;
+#endif
+
+        MappedSize = ((real_map_sz-1) & ~VIRTUAL_PAGE_MASK) + VIRTUAL_PAGE_SIZE;
+        if ( real_map_addr <= lpAddress &&
+             (VOID *)((UINT_PTR)real_map_addr+MappedSize) > lpAddress )
+        {
+            if (NULL != pView->lpWriteableAddress)
+            {
+                if (-1 == munmap(pView->lpWriteableAddress, pView->NumberOfBytesToMap))
+                {
+                    // Emit an error message in a trace, but continue trying to do the rest
+                    ERROR_(LOADER)("Unable to unmap a writeable mapping of a section\n");
+                    break;
+                }
+                pView->lpWriteableAddress = NULL;
+            }
+
+            fFound = TRUE;
+            break;
+        }
+    }
+
+    InternalLeaveCriticalSection(pThread, &mapping_critsec);
+
+    return fFound;
+}
+
+/*++
+Function :
+
+--*/
+BOOL PAL_RemovePEFileWriteableMappings(LPCVOID lpAddress)
+{
+    TRACE_(LOADER)("PAL_RemovePEFileWriteableMappings(lpAddress=%p)\n", lpAddress);
+
+    if ( NULL == lpAddress )
+    {
+        ERROR_(LOADER)( "lpAddress cannot be NULL\n" );
+        return FALSE;
+    }
+
+    BOOL retval = TRUE;
+    CPalThread * pThread = InternalGetCurrentThread();
+    InternalEnterCriticalSection(pThread, &mapping_critsec);
+    PLIST_ENTRY pLink, pLinkNext, pLinkLocal = NULL;
+    BOOL found;
+
+    for(pLink = MappedViewList.Flink;
+        pLink != &MappedViewList;
+        pLink = pLinkNext)
+    {
+        pLinkNext = pLink->Flink;
+        PMAPPED_VIEW_LIST pView = CONTAINING_RECORD(pLink, MAPPED_VIEW_LIST, Link);
+
+        if (pView->lpPEBaseAddress == lpAddress) // this entry is associated with the PE file
+        {
+            found = TRUE;
+
+            if (NULL != pView->lpWriteableAddress)
+            {
+                if (-1 == munmap(pView->lpWriteableAddress, pView->NumberOfBytesToMap))
+                {
+                    // Emit an error message in a trace, but continue trying to do the rest
+                    ERROR_(LOADER)("Unable to unmap a writeable mapping of a section\n");
+                    retval = FALSE;
+                }
+                pView->lpWriteableAddress = NULL;
+            }
+        }
+    }
+
+#if _DEBUG
+    if (!found)
+    {
+        ERROR_(LOADER)( "PAL_RemovePEFileWriteableMappings called with address that was not in the PE file mapping list\n" );
+    }
+#endif // _DEBUG
+
+    InternalLeaveCriticalSection(pThread, &mapping_critsec);
+
+    TRACE_(LOADER)("PAL_RemovePEFileWriteableMappings returning %d\n", retval);
+    return retval;
+}
+
 // Record a mapping in the MappedViewList list.
 // This call assumes the mapping_critsec has already been taken.
 static PAL_ERROR
@@ -2186,6 +2339,7 @@ MAPRecordMapping(
     IPalObject *pMappingObject,
     void *pPEBaseAddress,
     void *addr,
+    void *writeableAddr,
     size_t len,
     int prot
     )
@@ -2201,6 +2355,7 @@ MAPRecordMapping(
     if (NULL != pNewView)
     {
         pNewView->lpAddress = addr;
+        pNewView->lpWriteableAddress = writeableAddr;
         pNewView->NumberOfBytesToMap = len;
         pNewView->dwDesiredAccess = MAPMmapProtToAccessFlags(prot);
         pMappingObject->AddReference();
@@ -2236,7 +2391,8 @@ MAPmmapAndRecord(
     _ASSERTE(pPEBaseAddress != NULL);
 
     PAL_ERROR palError = NO_ERROR;
-    LPVOID pvBaseAddress = NULL;
+    LPVOID pvBaseAddress = MAP_FAILED;
+    LPVOID pvWriteableBaseAddress = MAP_FAILED;
 
     pvBaseAddress = mmap(addr, len, prot, flags, fd, offset);
     if (MAP_FAILED == pvBaseAddress)
@@ -2246,17 +2402,32 @@ MAPmmapAndRecord(
     }
     else
     {
-        palError = MAPRecordMapping(pMappingObject, pPEBaseAddress, pvBaseAddress, len, prot);
-        if (NO_ERROR != palError)
+        // Create secondary mapping with writeable access that is used for applying PE relocations.
+        pvWriteableBaseAddress = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, offset);
+        if (MAP_FAILED == pvWriteableBaseAddress)
         {
-            if (-1 == munmap(pvBaseAddress, len))
-            {
-                ERROR_(LOADER)("Unable to unmap the file. Expect trouble.\n");
-            }
+            ERROR_(LOADER)( "mmap failed with code %d: %s.\n", errno, strerror( errno ) );
+            palError = FILEGetLastErrorFromErrno();
         }
         else
         {
-            *ppvBaseAddress = pvBaseAddress;
+            palError = MAPRecordMapping(pMappingObject, pPEBaseAddress, pvBaseAddress, pvWriteableBaseAddress, len, prot);
+        }
+    }
+
+    if (NO_ERROR == palError)
+    {
+        *ppvBaseAddress = pvBaseAddress;
+    }
+    else
+    {
+        if ((MAP_FAILED != pvBaseAddress) && (-1 == munmap(pvBaseAddress, len)))
+        {
+            ERROR_(LOADER)("Unable to unmap the file. Expect trouble.\n");
+        }
+        if ((MAP_FAILED != pvWriteableBaseAddress) && (-1 == munmap(pvWriteableBaseAddress, len)))
+        {
+            ERROR_(LOADER)("Unable to unmap the file. Expect trouble.\n");
         }
     }
 
@@ -2555,6 +2726,7 @@ void * MAPMapPEFile(HANDLE hFile)
             palError = MAPRecordMapping(pFileObject,
                             loadedBase,
                             (void*)gapBase,
+                            NULL,
                             (char*)sectionBase - gapBase,
                             PROT_NONE);
             if (NO_ERROR != palError)
@@ -2612,6 +2784,7 @@ void * MAPMapPEFile(HANDLE hFile)
         palError = MAPRecordMapping(pFileObject,
                         loadedBase,
                         (void*)gapBase,
+                        NULL,
                         imageEnd - gapBase,
                         PROT_NONE);
         if (NO_ERROR != palError)
@@ -2727,6 +2900,14 @@ BOOL MAPUnmapPEFile(LPCVOID lpAddress)
 
         // remove pView mapping from the list
         if (-1 == munmap(pView->lpAddress, pView->NumberOfBytesToMap))
+        {
+            // Emit an error message in a trace, but continue trying to do the rest
+            ERROR_(LOADER)("Unable to unmap the file. Expect trouble.\n");
+            retval = FALSE;
+        }
+
+        if ((NULL != pView->lpWriteableAddress) &&
+            (-1 == munmap(pView->lpWriteableAddress, pView->NumberOfBytesToMap)))
         {
             // Emit an error message in a trace, but continue trying to do the rest
             ERROR_(LOADER)("Unable to unmap the file. Expect trouble.\n");

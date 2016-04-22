@@ -125,6 +125,36 @@ DWORD SectionCharacteristicsToPageProtection(USHORT characteristics)
     return pageProtection;
 }
 
+VOID* GetWriteablePESectionMapping(VOID* address, SIZE_T size, DWORD* oldProtection)
+{
+    VOID* writeableAddress;
+#ifdef FEATURE_PAL
+    // dummy nonzero value
+    *oldProtection = PAGE_READONLY;
+    if (!PAL_GetWriteablePESectionMapping(address, &writeableAddress))
+#else // FEATURE_PAL
+    writeableAddress = address;
+    if (!ClrVirtualProtect(address, size, PAGE_READWRITE, oldProtection))
+#endif // FEATURE_PAL
+    {
+        ThrowLastError();
+    }
+
+    return writeableAddress;
+}
+
+void RemoveWriteablePESectionMapping(VOID* address, SIZE_T size, DWORD oldProtection)
+{
+#ifdef FEATURE_PAL
+    if (!PAL_RemoveWriteablePESectionMapping(address))
+#else // FEATURE_PAL
+    if (!ClrVirtualProtect(address, size, oldProtection, &oldProtection))
+#endif // FEATURE_PAL
+    {
+        ThrowLastError();
+    }
+}
+
 //To force base relocation on Vista (which uses ASLR), unmask IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
 //(0x40) for OptionalHeader.DllCharacteristics
 void PEImageLayout::ApplyBaseRelocations()
@@ -141,107 +171,110 @@ void PEImageLayout::ApplyBaseRelocations()
     SSIZE_T delta = (SIZE_T) GetBase() - (SIZE_T) GetPreferredBase();
 
     // Nothing to do - image is loaded at preferred base
-    if (delta == 0)
-        return;
-
-    LOG((LF_LOADER, LL_INFO100, "PEImage: Applying base relocations (preferred: %x, actual: %x)\n",
-        GetPreferredBase(), GetBase()));
-
-    COUNT_T dirSize;
-    TADDR dir = GetDirectoryEntryData(IMAGE_DIRECTORY_ENTRY_BASERELOC, &dirSize);
-
-    // Minimize number of calls to VirtualProtect by keeping a whole section unprotected at a time.
-    BYTE * pWriteableRegion = NULL;
-    SIZE_T cbWriteableRegion = 0;
-    DWORD dwOldProtection = 0;
-
-    COUNT_T dirPos = 0;
-    while (dirPos < dirSize)
+    if (delta != 0)
     {
-        PIMAGE_BASE_RELOCATION r = (PIMAGE_BASE_RELOCATION)(dir + dirPos);
+        LOG((LF_LOADER, LL_INFO100, "PEImage: Applying base relocations (preferred: %x, actual: %x)\n",
+            GetPreferredBase(), GetBase()));
 
-        DWORD rva = VAL32(r->VirtualAddress);
+        COUNT_T dirSize;
+        TADDR dir = GetDirectoryEntryData(IMAGE_DIRECTORY_ENTRY_BASERELOC, &dirSize);
 
-        BYTE * pageAddress = (BYTE *)GetBase() + rva;
+        // Minimize number of calls to VirtualProtect by keeping a whole section unprotected at a time.
+        BYTE * pWriteableRegion = NULL;
+        SIZE_T cbWriteableRegion = 0;
+        DWORD dwOldProtection = 0;
+        VOID * writeableSectionBase = NULL;
+        SIZE_T sectionRva = 0;
 
-        // Check whether the page is outside the unprotected region
-        if ((SIZE_T)(pageAddress - pWriteableRegion) >= cbWriteableRegion)
+        COUNT_T dirPos = 0;
+        while (dirPos < dirSize)
         {
-            // Restore the protection
-            if (dwOldProtection != 0)
-            {
-                if (!ClrVirtualProtect(pWriteableRegion, cbWriteableRegion,
-                                       dwOldProtection, &dwOldProtection))
-                    ThrowLastError();
+            PIMAGE_BASE_RELOCATION r = (PIMAGE_BASE_RELOCATION)(dir + dirPos);
 
-                dwOldProtection = 0;
+            DWORD rva = VAL32(r->VirtualAddress);
+
+            BYTE * pageAddress = (BYTE *)GetBase() + rva;
+            // Check whether the page is outside the unprotected region
+            if ((SIZE_T)(pageAddress - pWriteableRegion) >= cbWriteableRegion)
+            {
+                // Restore the protection
+                if (dwOldProtection != 0)
+                {
+                    RemoveWriteablePESectionMapping(pWriteableRegion, cbWriteableRegion, dwOldProtection);
+                    dwOldProtection = 0;
+                }
+
+                IMAGE_SECTION_HEADER *pSection = RvaToSection(rva);
+                PREFIX_ASSUME(pSection != NULL);
+
+                pWriteableRegion = (BYTE*)GetRvaData(VAL32(pSection->VirtualAddress));
+                cbWriteableRegion = VAL32(pSection->SizeOfRawData);
+                sectionRva = VAL32(pSection->VirtualAddress);
+
+                // Unprotect the section if it is not writeable
+                if (((pSection->Characteristics & VAL32(IMAGE_SCN_MEM_WRITE)) == 0))
+                {
+                    writeableSectionBase = GetWriteablePESectionMapping(pWriteableRegion, cbWriteableRegion, &dwOldProtection);
+                }
+                else
+                {
+                    writeableSectionBase = pWriteableRegion;
+                }
             }
 
-            IMAGE_SECTION_HEADER *pSection = RvaToSection(rva);
-            PREFIX_ASSUME(pSection != NULL);
+            _ASSERTE(memcmp(writeableSectionBase, pWriteableRegion, cbWriteableRegion) == 0);
 
-            pWriteableRegion = (BYTE*)GetRvaData(VAL32(pSection->VirtualAddress));
-            cbWriteableRegion = VAL32(pSection->SizeOfRawData);
+            BYTE * writeablePageAddress = (BYTE *)writeableSectionBase + rva - sectionRva;
 
-            // Unprotect the section if it is not writable
-            if (((pSection->Characteristics & VAL32(IMAGE_SCN_MEM_WRITE)) == 0))
+            COUNT_T fixupsSize = VAL32(r->SizeOfBlock);
+
+            USHORT *fixups = (USHORT *) (r + 1);
+
+            _ASSERTE(fixupsSize > sizeof(IMAGE_BASE_RELOCATION));
+            _ASSERTE((fixupsSize - sizeof(IMAGE_BASE_RELOCATION)) % 2 == 0);
+
+            COUNT_T fixupsCount = (fixupsSize - sizeof(IMAGE_BASE_RELOCATION)) / 2;
+
+            _ASSERTE((BYTE *)(fixups + fixupsCount) <= (BYTE *)(dir + dirSize));
+
+            for (COUNT_T fixupIndex = 0; fixupIndex < fixupsCount; fixupIndex++)
             {
-                if (!ClrVirtualProtect(pWriteableRegion, cbWriteableRegion,
-                                       PAGE_READWRITE, &dwOldProtection))
-                    ThrowLastError();
+                USHORT fixup = VAL16(fixups[fixupIndex]);
 
-                dwOldProtection = SectionCharacteristicsToPageProtection(pSection->Characteristics);
-            }
-        }
+                BYTE * address = writeablePageAddress + (fixup & 0xfff);
 
-        COUNT_T fixupsSize = VAL32(r->SizeOfBlock);
-
-        USHORT *fixups = (USHORT *) (r + 1);
-
-        _ASSERTE(fixupsSize > sizeof(IMAGE_BASE_RELOCATION));
-        _ASSERTE((fixupsSize - sizeof(IMAGE_BASE_RELOCATION)) % 2 == 0);
-
-        COUNT_T fixupsCount = (fixupsSize - sizeof(IMAGE_BASE_RELOCATION)) / 2;
-
-        _ASSERTE((BYTE *)(fixups + fixupsCount) <= (BYTE *)(dir + dirSize));
-
-        for (COUNT_T fixupIndex = 0; fixupIndex < fixupsCount; fixupIndex++)
-        {
-            USHORT fixup = VAL16(fixups[fixupIndex]);
-
-            BYTE * address = pageAddress + (fixup & 0xfff);
-
-            switch (fixup>>12)
-            {
-            case IMAGE_REL_BASED_PTR:
-                *(TADDR *)address += delta;
-                break;
+                switch (fixup>>12)
+                {
+                case IMAGE_REL_BASED_PTR:
+                    *(TADDR *)address += delta;
+                    break;
 
 #ifdef _TARGET_ARM_
-            case IMAGE_REL_BASED_THUMB_MOV32:
-                PutThumb2Mov32((UINT16 *)address, GetThumb2Mov32((UINT16 *)address) + delta);
-                break;
+                case IMAGE_REL_BASED_THUMB_MOV32:
+                    PutThumb2Mov32((UINT16 *)address, GetThumb2Mov32((UINT16 *)address) + delta);
+                    break;
 #endif
 
-            case IMAGE_REL_BASED_ABSOLUTE:
-                //no adjustment
-                break;
+                case IMAGE_REL_BASED_ABSOLUTE:
+                    //no adjustment
+                    break;
 
-            default:
-                _ASSERTE(!"Unhandled reloc type!");
+                default:
+                    _ASSERTE(!"Unhandled reloc type!");
+                }
             }
+
+            _ASSERTE(memcmp(writeableSectionBase, pWriteableRegion, cbWriteableRegion) == 0);
+            
+            dirPos += fixupsSize;
         }
+        _ASSERTE(dirSize == dirPos);
 
-        dirPos += fixupsSize;
-    }
-    _ASSERTE(dirSize == dirPos);
-
-    if (dwOldProtection != 0)
-    {
-        // Restore the protection
-        if (!ClrVirtualProtect(pWriteableRegion, cbWriteableRegion,
-                               dwOldProtection, &dwOldProtection))
-            ThrowLastError();
+        if (dwOldProtection != 0)
+        {
+            // Restore the protection
+            RemoveWriteablePESectionMapping(pWriteableRegion, cbWriteableRegion, dwOldProtection);
+        }
     }
 }
 #endif // FEATURE_PREJIT

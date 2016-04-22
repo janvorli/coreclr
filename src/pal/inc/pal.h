@@ -3477,6 +3477,19 @@ PAL_RegisterLibraryDirect(
         IN void *dl_handle,
         IN LPCWSTR lpLibFileName);
 
+PALIMPORT
+BOOL
+PALAPI
+PAL_GetWriteablePESectionMapping(
+    IN LPVOID lpAddress,
+    OUT LPVOID* lpWriteableAddress);
+
+PALIMPORT
+BOOL
+PALAPI
+PAL_RemoveWriteablePESectionMapping(
+    IN LPVOID lpAddress);
+
 /*++
 Function:
   PAL_LOADLoadPEFile

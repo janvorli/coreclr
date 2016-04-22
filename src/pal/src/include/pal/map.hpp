@@ -133,6 +133,7 @@ namespace CorUnix
                                                physical file, per process */
 #endif
         LPVOID lpAddress;           /* The pointer to the mapped memory. */
+        LPVOID lpWriteableAddress;  /* The pointer to a secondary mapping that is writeable. */
         SIZE_T NumberOfBytesToMap;  /* Number of bytes to map. */
         DWORD dwDesiredAccess;      /* Desired access. */
         LPVOID lpPEBaseAddress;     /* If this mapping is part of a PE file mapping, this is the
