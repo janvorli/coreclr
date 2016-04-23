@@ -2571,8 +2571,10 @@ void * MAPMapPEFile(HANDLE hFile)
             prot |= PROT_EXEC;
         if (currentHeader.Characteristics & IMAGE_SCN_MEM_READ)
             prot |= PROT_READ;
-        if (currentHeader.Characteristics & IMAGE_SCN_MEM_WRITE)
-            prot |= PROT_WRITE;
+
+        // On SELinux, it is not allowed to change protection of a section from non-executable to executable,
+        // so we rather map all sections as writable
+        prot |= PROT_WRITE;
 
         palError = MAPmmapAndRecord(pFileObject, loadedBase,
                         sectionBase,

@@ -151,6 +151,9 @@ void PEImageLayout::ApplyBaseRelocations()
             pWriteableRegion = (BYTE*)GetRvaData(VAL32(pSection->VirtualAddress));
             cbWriteableRegion = VAL32(pSection->SizeOfRawData);
 
+// On SELinux, it is not allowed to change protection of a section from non-executable to executable,
+// so we map all sections as writable on Unix
+#ifndef FEATURE_PAL
             // Unprotect the section if it is not writable
             if (((pSection->Characteristics & VAL32(IMAGE_SCN_MEM_WRITE)) == 0))
             {
@@ -158,6 +161,7 @@ void PEImageLayout::ApplyBaseRelocations()
                                        PAGE_READWRITE, &dwOldProtection))
                     ThrowLastError();
             }
+#endif // FEATURE_PAL
         }
 
         COUNT_T fixupsSize = VAL32(r->SizeOfBlock);
