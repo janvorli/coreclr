@@ -80,7 +80,7 @@ public:
 
     static void GcEnumAllocContexts(enum_alloc_context_func* fn, void* param);
 
-    static bool CreateBackgroundThread(Thread** thread, GCBackgroundThreadFunction threadStart, void* arg);
+    static Thread* CreateBackgroundThread(GCBackgroundThreadFunction threadStart, void* arg);
 };
 
 #endif // __GCENV_EE_H__

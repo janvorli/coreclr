@@ -747,7 +747,43 @@ void GCToEEInterface::DisablePreemptiveGC(Thread * pThread)
     pThread->DisablePreemptiveGC();
 }
 
-bool GCToEEInterface::CreateBackgroundThread(Thread** thread, GCBackgroundThreadFunction threadStart, void* arg)
+struct BackgroundThreadStubArgs
+{
+    Thread* thread;
+    GCBackgroundThreadFunction threadStart;
+    void* arg;
+    CLREvent threadStartedEvent;
+    bool hasStarted;
+};
+
+DWORD BackgroundThreadStub(void* arg)
+{
+    BackgroundThreadStubArgs* stubArgs = (BackgroundThreadStubArgs*)arg;
+    assert (stubArgs->thread != NULL);
+
+    ClrFlsSetThreadType (ThreadType_GC);
+    GCToEEInterface::SetGCSpecial(stubArgs->thread);
+    STRESS_LOG_RESERVE_MEM (GC_STRESSLOG_MULTIPLY);
+
+    stubArgs->hasStarted = !!stubArgs->thread->HasStarted(FALSE);
+
+    GCBackgroundThreadFunction realThreadStart = stubArgs->threadStart;
+    void* realThreadArg = stubArgs->arg;
+    bool hasStarted = stubArgs->hasStarted;
+
+    stubArgs->threadStartedEvent.Set();
+    // The stubArgs cannot be used once the event is set, since that releases wait on the
+    // event in the function that created this thread and the stubArgs go out of scope.
+
+    if (hasStarted)
+    {
+        return realThreadStart(realThreadArg);
+    }
+
+    return 0;
+}
+
+Thread* GCToEEInterface::CreateBackgroundThread(GCBackgroundThreadFunction threadStart, void* arg)
 {
     CONTRACTL
     {
@@ -756,29 +792,56 @@ bool GCToEEInterface::CreateBackgroundThread(Thread** thread, GCBackgroundThread
     }
     CONTRACTL_END;
 
-    Thread* newThread = NULL;
+    BackgroundThreadStubArgs threadStubArgs;
+
+    threadStubArgs.arg = arg;
+    threadStubArgs.thread = NULL;
+    threadStubArgs.threadStart = threadStart;
+
+    if (!threadStubArgs.threadStartedEvent.CreateAutoEventNoThrow(FALSE))
+    {
+        return NULL;
+    }
+
     EX_TRY
     {
-        newThread = SetupUnstartedThread(FALSE);
-        *thread = newThread;
+        threadStubArgs.thread = SetupUnstartedThread(FALSE);
     }
     EX_CATCH
     {
     }
     EX_END_CATCH(SwallowAllExceptions);
 
-    if ((newThread != NULL) && newThread->CreateNewThread(0, (LPTHREAD_START_ROUTINE)threadStart, arg))
+    if (threadStubArgs.thread == NULL)
     {
-        newThread->SetBackground (TRUE, FALSE);
-
-        // wait for the thread to be in its main loop, this is to detect the situation
-        // where someone triggers a GC during dll loading where the loader lock is
-        // held.
-        newThread->StartThread();
-
-        return true;
+        threadStubArgs.threadStartedEvent.CloseEvent();
+        return NULL;
     }
 
-    *thread = NULL;
-    return false;
+    // TODO: what does cleanup of the thread if it fails to create?
+    if (threadStubArgs.thread->CreateNewThread(0, (LPTHREAD_START_ROUTINE)BackgroundThreadStub, &threadStubArgs))
+    {
+        threadStubArgs.thread->SetBackground (TRUE, FALSE);
+        threadStubArgs.thread->StartThread();
+
+        // TODO: what does cleanup of the thread if it fails to start?
+
+        // Wait for the thread to be in its main loop
+        uint32_t res = threadStubArgs.threadStartedEvent.Wait(INFINITE,FALSE);
+        threadStubArgs.threadStartedEvent.CloseEvent();
+
+        if (res == WAIT_TIMEOUT)
+        {
+            return NULL;
+        }
+
+        if (!threadStubArgs.hasStarted)
+        {
+            return NULL;
+        }
+
+        return threadStubArgs.thread;
+    }
+
+    return NULL;
 }

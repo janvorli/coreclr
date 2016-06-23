@@ -408,6 +408,26 @@ void Object::SetAppDomain(AppDomain *pDomain)
     _ASSERTE(GetHeader()->GetAppDomainIndex().m_dwIndex != 0);
 }
 
+void Object::SetAppDomainNoThrow()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+        SO_INTOLERANT;
+    }
+    CONTRACTL_END;
+
+    EX_TRY
+    {
+        SetAppDomain();
+    }
+    EX_CATCH
+    {
+        _ASSERTE (!"Exception happened during Object::SetAppDomain");
+    }
+    EX_END_CATCH(RethrowTerminalExceptions)    
+}
 
 AppDomain *Object::GetAppDomain()
 {
