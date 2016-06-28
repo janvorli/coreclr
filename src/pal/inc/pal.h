@@ -6451,10 +6451,6 @@ struct PAL_SEHException
 private:
     static const SIZE_T NoTargetFrameSp = SIZE_MAX;
 public:
-    // Note that the following two are actually embedded in this heap-allocated
-    // instance - in contrast to Win32, where the exception record would usually
-    // be allocated on the stack.  This is needed because foreign cleanup handlers
-    // partially unwind the stack on the second pass.
     EXCEPTION_POINTERS ExceptionPointers;
     // Target frame stack pointer set before the 2nd pass.
     SIZE_T TargetFrameSp;
@@ -6490,8 +6486,19 @@ public:
     {
         free(ExceptionPointers.ExceptionRecord);
         ExceptionPointers.ExceptionRecord = NULL;
+
         free(ExceptionPointers.ContextRecord);
         ExceptionPointers.ContextRecord = NULL;
+    }
+
+    CONTEXT* GetContextRecord()
+    {
+        return ExceptionPointers.ContextRecord;
+    }
+
+    EXCEPTION_RECORD* GetExceptionRecord()
+    {
+        return ExceptionPointers.ExceptionRecord;
     }
 
     bool IsFirstPass()

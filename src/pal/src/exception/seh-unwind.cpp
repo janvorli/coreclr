@@ -585,8 +585,7 @@ RtlpRaiseException(EXCEPTION_RECORD *ExceptionRecord)
     ZeroMemory(ContextRecord, sizeof(CONTEXT));
     ContextRecord->ContextFlags = CONTEXT_FULL;
     CONTEXT_CaptureContext(ContextRecord);
-    EXCEPTION_RECORD *ExceptionRecordCopy = (EXCEPTION_RECORD *)malloc(sizeof(EXCEPTION_RECORD));
-    *ExceptionRecordCopy = *ExceptionRecord;
+
     // Find the caller of RtlpRaiseException.  
     PAL_VirtualUnwind(ContextRecord, NULL);
 
@@ -594,9 +593,9 @@ RtlpRaiseException(EXCEPTION_RECORD *ExceptionRecord)
     // level further to get the actual context user code could be resumed at.
     PAL_VirtualUnwind(ContextRecord, NULL);
 
-    ExceptionRecordCopy->ExceptionAddress = (void *)CONTEXTGetPC(ContextRecord);
+    ExceptionRecord->ExceptionAddress = (void *)CONTEXTGetPC(ContextRecord);
 
-    throw PAL_SEHException(ExceptionRecordCopy, ContextRecord);
+    throw PAL_SEHException(ExceptionRecord, ContextRecord);
 }
 
 /*++
@@ -635,20 +634,20 @@ RaiseException(IN DWORD dwExceptionCode,
         nNumberOfArguments = EXCEPTION_MAXIMUM_PARAMETERS;
     }
 
-    EXCEPTION_RECORD exceptionRecord;
-    ZeroMemory(&exceptionRecord, sizeof(EXCEPTION_RECORD));
+    EXCEPTION_RECORD *exceptionRecord = (EXCEPTION_RECORD *)malloc(sizeof(EXCEPTION_RECORD));
+    ZeroMemory(exceptionRecord, sizeof(EXCEPTION_RECORD));
 
-    exceptionRecord.ExceptionCode = dwExceptionCode;
-    exceptionRecord.ExceptionFlags = dwExceptionFlags;
-    exceptionRecord.ExceptionRecord = NULL;
-    exceptionRecord.ExceptionAddress = NULL; // will be set by RtlpRaiseException
-    exceptionRecord.NumberParameters = nNumberOfArguments;
+    exceptionRecord->ExceptionCode = dwExceptionCode;
+    exceptionRecord->ExceptionFlags = dwExceptionFlags;
+    exceptionRecord->ExceptionRecord = NULL;
+    exceptionRecord->ExceptionAddress = NULL; // will be set by RtlpRaiseException
+    exceptionRecord->NumberParameters = nNumberOfArguments;
     if (nNumberOfArguments)
     {
-        CopyMemory(exceptionRecord.ExceptionInformation, lpArguments,
+        CopyMemory(exceptionRecord->ExceptionInformation, lpArguments,
                    nNumberOfArguments * sizeof(ULONG_PTR));
     }
-    RtlpRaiseException(&exceptionRecord);
+    RtlpRaiseException(exceptionRecord);
 
     LOGEXIT("RaiseException returns\n");
 }

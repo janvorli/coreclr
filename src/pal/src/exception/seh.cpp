@@ -249,7 +249,7 @@ SEHProcessException(PEXCEPTION_POINTERS pointers)
 
         if (CatchHardwareExceptionHolder::IsEnabled())
         {
-            PAL_ThrowExceptionFromContext(exception.ExceptionPointers.ContextRecord, &exception);
+            PAL_ThrowExceptionFromContext(exception.GetContextRecord(), &exception);
         }
     }
 
