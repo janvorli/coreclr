@@ -6456,34 +6456,43 @@ public:
     // be allocated on the stack.  This is needed because foreign cleanup handlers
     // partially unwind the stack on the second pass.
     EXCEPTION_POINTERS ExceptionPointers;
-    EXCEPTION_RECORD ExceptionRecord;
-    CONTEXT ContextRecord;
     // Target frame stack pointer set before the 2nd pass.
     SIZE_T TargetFrameSp;
 
     PAL_SEHException(EXCEPTION_RECORD *pExceptionRecord, CONTEXT *pContextRecord)
     {
-        ExceptionPointers.ExceptionRecord = &ExceptionRecord;
-        ExceptionPointers.ContextRecord = &ContextRecord;
-        ExceptionRecord = *pExceptionRecord;
-        ContextRecord = *pContextRecord;
+        ExceptionPointers.ExceptionRecord = pExceptionRecord;
+        ExceptionPointers.ContextRecord = pContextRecord;
         TargetFrameSp = NoTargetFrameSp;
     }
 
     PAL_SEHException()
     {
+        ExceptionPointers.ExceptionRecord = NULL;
+        ExceptionPointers.ContextRecord = NULL;
+        TargetFrameSp = NoTargetFrameSp;
     }    
 
     PAL_SEHException(const PAL_SEHException& ex) = delete;
 
     PAL_SEHException(PAL_SEHException&& ex)
     {
-        ExceptionPointers.ExceptionRecord = &ExceptionRecord;
-        ExceptionPointers.ContextRecord = &ContextRecord;
-        ExceptionRecord = ex.ExceptionRecord;
-        ContextRecord = ex.ContextRecord;
+        ExceptionPointers.ExceptionRecord = ex.ExceptionPointers.ExceptionRecord;
+        ExceptionPointers.ContextRecord = ex.ExceptionPointers.ContextRecord;
         TargetFrameSp = ex.TargetFrameSp;
+
+        ex.ExceptionPointers.ExceptionRecord = NULL;
+        ex.ExceptionPointers.ContextRecord = NULL;
     }    
+
+    
+    ~PAL_SEHException()
+    {
+        free(ExceptionPointers.ExceptionRecord);
+        ExceptionPointers.ExceptionRecord = NULL;
+        free(ExceptionPointers.ContextRecord);
+        ExceptionPointers.ContextRecord = NULL;
+    }
 
     bool IsFirstPass()
     {
@@ -6497,11 +6506,12 @@ public:
 
     PAL_SEHException& operator=(PAL_SEHException&& ex)
     {
-        ExceptionPointers.ExceptionRecord = &ExceptionRecord;
-        ExceptionPointers.ContextRecord = &ContextRecord;
-        ExceptionRecord = ex.ExceptionRecord;
-        ContextRecord = ex.ContextRecord;
+        ExceptionPointers.ExceptionRecord = ex.ExceptionPointers.ExceptionRecord;
+        ExceptionPointers.ContextRecord = ex.ExceptionPointers.ContextRecord;
         TargetFrameSp = ex.TargetFrameSp;
+
+        ex.ExceptionPointers.ExceptionRecord = NULL;
+        ex.ExceptionPointers.ContextRecord = NULL;
 
         return *this;
     }
