@@ -39,6 +39,7 @@ Abstract:
 #include <unistd.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <utility>
 
 using namespace CorUnix;
 
@@ -177,7 +178,7 @@ PAL_ThrowExceptionFromContext(CONTEXT* context, PAL_SEHException* ex)
     // frames that will become obsolete by the ThrowExceptionFromContextInternal and the ThrowExceptionHelper
     // could overwrite the "ex" object by stack e.g. when allocating the low level exception object for "throw".
     static __thread BYTE threadLocalExceptionStorage[sizeof(PAL_SEHException)];
-    ThrowExceptionFromContextInternal(context, new (threadLocalExceptionStorage) PAL_SEHException(*ex));
+    ThrowExceptionFromContextInternal(context, new (threadLocalExceptionStorage) PAL_SEHException(std::move(*ex)));
 }
 
 /*++
@@ -193,7 +194,7 @@ Parameters:
 extern "C"
 void ThrowExceptionHelper(PAL_SEHException* ex)
 {
-    throw *ex;
+    throw std::move(*ex);
 }
 
 /*++

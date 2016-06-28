@@ -6474,9 +6474,15 @@ public:
     {
     }    
 
-    PAL_SEHException(const PAL_SEHException& ex)
+    PAL_SEHException(const PAL_SEHException& ex) = delete;
+
+    PAL_SEHException(PAL_SEHException&& ex)
     {
-        *this = ex;
+        ExceptionPointers.ExceptionRecord = &ExceptionRecord;
+        ExceptionPointers.ContextRecord = &ContextRecord;
+        ExceptionRecord = ex.ExceptionRecord;
+        ContextRecord = ex.ContextRecord;
+        TargetFrameSp = ex.TargetFrameSp;
     }    
 
     bool IsFirstPass()
@@ -6489,7 +6495,7 @@ public:
         TargetFrameSp = NoTargetFrameSp;
     }
 
-    PAL_SEHException& operator=(const PAL_SEHException& ex)
+    PAL_SEHException& operator=(PAL_SEHException&& ex)
     {
         ExceptionPointers.ExceptionRecord = &ExceptionRecord;
         ExceptionPointers.ContextRecord = &ContextRecord;

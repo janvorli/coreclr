@@ -4696,7 +4696,7 @@ VOID DECLSPEC_NORETURN DispatchManagedException(PAL_SEHException& ex, bool isHar
         catch (PAL_SEHException& ex2)
         {
             isHardwareException = false;
-            ex = ex2;
+            ex = std::move(ex2);
         }
 
     }
