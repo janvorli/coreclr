@@ -4415,9 +4415,6 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
             dispatcherContext.EstablisherFrame = establisherFrame;
             dispatcherContext.ContextRecord = currentFrameContext;
 
-            EXCEPTION_RECORD savedExceptionRecord;
-            EXCEPTION_RECORD* exceptionRecord = ex.GetExceptionRecord();
-
             if (establisherFrame == ex.TargetFrameSp)
             {
                 // We have reached the frame that will handle the exception.
@@ -4425,16 +4422,11 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
                 // instead. So we need to destroy the exception object here in order to release the context
                 // and exception records it points to.
                 // We need to make a copy of the ExceptionRecord for the ProcessCLRException though
-                savedExceptionRecord = *ex.GetExceptionRecord();
-                exceptionRecord = &savedExceptionRecord;
-
-                exRecord.ExceptionFlags |= EXCEPTION_TARGET_UNWIND;
-
-                ex.~PAL_SEHException();
+                ex.GetExceptionRecord()->ExceptionFlags |= EXCEPTION_TARGET_UNWIND;
             }
 
             // Perform unwinding of the current frame
-            disposition = ProcessCLRException(exceptionRecord,
+            disposition = ProcessCLRException(ex.GetExceptionRecord(),
                 establisherFrame,
                 currentFrameContext,
                 &dispatcherContext);
@@ -7008,8 +7000,10 @@ void ExceptionTracker::ReleaseResources()
 
 #ifndef FEATURE_PAL 
     // Clear any held Watson Bucketing details
-    GetWatsonBucketTracker()->ClearWatsonBucketDetails();   
-#endif // !FEATURE_PAL 
+    GetWatsonBucketTracker()->ClearWatsonBucketDetails();
+#else // !FEATURE_PAL
+    PAL_FreeExceptionRecords(m_ptrs.ExceptionRecord, m_ptrs.ContextRecord);
+#endif // !FEATURE_PAL
 #endif // DACCESS_COMPILE
 }
 

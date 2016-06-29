@@ -560,6 +560,48 @@ BOOL PAL_VirtualUnwindOutOfProc(CONTEXT *context,
 
 /*++
 Function:
+    AllocateExceptionRecords
+
+    Allocate EXCEPTION_RECORD and CONTEXT structures for an exception.
+Parameters:
+    exceptionRecord - output pointer to the allocated exception record
+    contextRecord - output pointer to the allocated context record
+--*/
+VOID
+AllocateExceptionRecords(EXCEPTION_RECORD** exceptionRecord, CONTEXT** contextRecord)
+{
+    void* records = aligned_alloc(alignof(CONTEXT), sizeof(CONTEXT) + sizeof(EXCEPTION_RECORD));
+    if (records == NULL)
+    {
+        // TODO: use a predefined buffer? 
+        // Options - TLS of multiple contexts per thread - scales with number of threads
+        //         - global memory range
+    }
+
+    *contextRecord = (CONTEXT*)records;
+    *exceptionRecord = (EXCEPTION_RECORD*)(*contextRecord + 1);
+}
+
+/*++
+Function:
+    PAL_FreeExceptionRecords
+
+    Free EXCEPTION_RECORD and CONTEXT structures of an exception that were allocated by the
+    AllocateExceptionRecords.
+Parameters:
+    exceptionRecord - exception record
+    contextRecord - context record
+--*/
+VOID
+PALAPI
+PAL_FreeExceptionRecords(IN EXCEPTION_RECORD *exceptionRecord, IN CONTEXT *contextRecord)
+{
+    // Both records are allocated at once and the allocated memory starts at the contextRecord
+    free(contextRecord);
+}
+
+/*++
+Function:
     RtlpRaiseException
 
 Parameters:
@@ -568,7 +610,7 @@ Parameters:
 Note:
     The name of this function and the name of the ExceptionRecord 
     parameter is used in the sos lldb plugin code to read the exception
-    record. See coreclr\src\ToolBox\SOS\lldbplugin\debugclient.cpp.
+    record. See coreclr\src\ToolBox\SOS\lldbplugin\services.cpp.
 
     This function must not be inlined or optimized so the below PAL_VirtualUnwind
     calls end up with RaiseException caller's context and so the above debugger 
@@ -578,23 +620,8 @@ PAL_NORETURN
 __attribute__((noinline))
 __attribute__((optnone))
 static void 
-RtlpRaiseException(EXCEPTION_RECORD *ExceptionRecord)
+RtlpRaiseException(EXCEPTION_RECORD *ExceptionRecord, CONTEXT *ContextRecord)
 {
-    // Capture the context of RtlpRaiseException.
-    CONTEXT *ContextRecord = (CONTEXT *)malloc(sizeof(CONTEXT));
-    ZeroMemory(ContextRecord, sizeof(CONTEXT));
-    ContextRecord->ContextFlags = CONTEXT_FULL;
-    CONTEXT_CaptureContext(ContextRecord);
-
-    // Find the caller of RtlpRaiseException.  
-    PAL_VirtualUnwind(ContextRecord, NULL);
-
-    // The frame we're looking at now is RaiseException. We have to unwind one 
-    // level further to get the actual context user code could be resumed at.
-    PAL_VirtualUnwind(ContextRecord, NULL);
-
-    ExceptionRecord->ExceptionAddress = (void *)CONTEXTGetPC(ContextRecord);
-
     throw PAL_SEHException(ExceptionRecord, ContextRecord);
 }
 
@@ -605,6 +632,7 @@ Function:
 See MSDN doc.
 --*/
 // no PAL_NORETURN, as callers must assume this can return for continuable exceptions.
+__attribute__((noinline))
 VOID
 PALAPI
 RaiseException(IN DWORD dwExceptionCode,
@@ -634,7 +662,10 @@ RaiseException(IN DWORD dwExceptionCode,
         nNumberOfArguments = EXCEPTION_MAXIMUM_PARAMETERS;
     }
 
-    EXCEPTION_RECORD *exceptionRecord = (EXCEPTION_RECORD *)malloc(sizeof(EXCEPTION_RECORD));
+    CONTEXT *contextRecord;
+    EXCEPTION_RECORD *exceptionRecord;
+    AllocateExceptionRecords(&exceptionRecord, &contextRecord);
+
     ZeroMemory(exceptionRecord, sizeof(EXCEPTION_RECORD));
 
     exceptionRecord->ExceptionCode = dwExceptionCode;
@@ -647,7 +678,18 @@ RaiseException(IN DWORD dwExceptionCode,
         CopyMemory(exceptionRecord->ExceptionInformation, lpArguments,
                    nNumberOfArguments * sizeof(ULONG_PTR));
     }
-    RtlpRaiseException(exceptionRecord);
+
+    // Capture the context of RaiseException.
+    ZeroMemory(contextRecord, sizeof(CONTEXT));
+    contextRecord->ContextFlags = CONTEXT_FULL;
+    CONTEXT_CaptureContext(contextRecord);
+
+    // We have to unwind one level to get the actual context user code could be resumed at.
+    PAL_VirtualUnwind(contextRecord, NULL);
+
+    exceptionRecord->ExceptionAddress = (void *)CONTEXTGetPC(contextRecord);
+
+    RtlpRaiseException(exceptionRecord, contextRecord);
 
     LOGEXIT("RaiseException returns\n");
 }

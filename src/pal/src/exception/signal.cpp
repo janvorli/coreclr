@@ -95,6 +95,7 @@ struct sigaction g_previous_sigquit;
 struct sigaction g_previous_sigterm;
 
 static bool registered_sigterm_handler = false;
+static bool registered_hardware_exception_handlers = false;
 
 #ifdef INJECT_ACTIVATION_SIGNAL
 struct sigaction g_previous_activation;
@@ -131,13 +132,17 @@ BOOL SEHInitializeSignals(DWORD flags)
 
        see sigaction man page for more details
        */
-    handle_signal(SIGILL, sigill_handler, &g_previous_sigill);
-    handle_signal(SIGTRAP, sigtrap_handler, &g_previous_sigtrap);
-    handle_signal(SIGFPE, sigfpe_handler, &g_previous_sigfpe);
-    handle_signal(SIGBUS, sigbus_handler, &g_previous_sigbus);
-    handle_signal(SIGSEGV, sigsegv_handler, &g_previous_sigsegv);
-    handle_signal(SIGINT, sigint_handler, &g_previous_sigint);
-    handle_signal(SIGQUIT, sigquit_handler, &g_previous_sigquit);
+    if (flags & PAL_INITIALIZE_REGISTER_HARDWARE_EXCEPTION_HANDLERS)
+    {
+        handle_signal(SIGILL, sigill_handler, &g_previous_sigill);
+        handle_signal(SIGTRAP, sigtrap_handler, &g_previous_sigtrap);
+        handle_signal(SIGFPE, sigfpe_handler, &g_previous_sigfpe);
+        handle_signal(SIGBUS, sigbus_handler, &g_previous_sigbus);
+        handle_signal(SIGSEGV, sigsegv_handler, &g_previous_sigsegv);
+        handle_signal(SIGINT, sigint_handler, &g_previous_sigint);
+        handle_signal(SIGQUIT, sigquit_handler, &g_previous_sigquit);
+        registered_hardware_exception_handlers = true;
+    }
 
     if (flags & PAL_INITIALIZE_REGISTER_SIGTERM_HANDLER)
     {
@@ -182,13 +187,16 @@ void SEHCleanupSignals()
 {
     TRACE("Restoring default signal handlers\n");
 
-    restore_signal(SIGILL, &g_previous_sigill);
-    restore_signal(SIGTRAP, &g_previous_sigtrap);
-    restore_signal(SIGFPE, &g_previous_sigfpe);
-    restore_signal(SIGBUS, &g_previous_sigbus);
-    restore_signal(SIGSEGV, &g_previous_sigsegv);
-    restore_signal(SIGINT, &g_previous_sigint);
-    restore_signal(SIGQUIT, &g_previous_sigquit);
+    if (registered_hardware_exception_handlers)
+    {
+        restore_signal(SIGILL, &g_previous_sigill);
+        restore_signal(SIGTRAP, &g_previous_sigtrap);
+        restore_signal(SIGFPE, &g_previous_sigfpe);
+        restore_signal(SIGBUS, &g_previous_sigbus);
+        restore_signal(SIGSEGV, &g_previous_sigsegv);
+        restore_signal(SIGINT, &g_previous_sigint);
+        restore_signal(SIGQUIT, &g_previous_sigquit);
+    }
 
     if (registered_sigterm_handler)
     {
@@ -571,39 +579,36 @@ Note:
 static void common_signal_handler(int code, siginfo_t *siginfo, void *sigcontext, int numParams, ...)
 {
     sigset_t signal_set;
-    CONTEXT context;
-    EXCEPTION_RECORD record;
-    EXCEPTION_POINTERS pointers;
+    CONTEXT *contextRecord;
+    EXCEPTION_RECORD *exceptionRecord;
     native_context_t *ucontext;
 
     ucontext = (native_context_t *)sigcontext;
 
-    record.ExceptionCode = CONTEXTGetExceptionCodeForSignal(siginfo, ucontext);
-    record.ExceptionFlags = EXCEPTION_IS_SIGNAL;
-    record.ExceptionRecord = NULL;
-    record.ExceptionAddress = GetNativeContextPC(ucontext);
-    record.NumberParameters = numParams;
+    AllocateExceptionRecords(&exceptionRecord, &contextRecord);
+
+    exceptionRecord->ExceptionCode = CONTEXTGetExceptionCodeForSignal(siginfo, ucontext);
+    exceptionRecord->ExceptionFlags = EXCEPTION_IS_SIGNAL;
+    exceptionRecord->ExceptionRecord = NULL;
+    exceptionRecord->ExceptionAddress = GetNativeContextPC(ucontext);
+    exceptionRecord->NumberParameters = numParams;
 
     va_list params;
     va_start(params, numParams);
 
     for (int i = 0; i < numParams; i++)
     {
-        record.ExceptionInformation[i] = va_arg(params, size_t);
+        exceptionRecord->ExceptionInformation[i] = va_arg(params, size_t);
     }
-
-    pointers.ExceptionRecord = &record;
 
     // Pre-populate context with data from current frame, because ucontext doesn't have some data (e.g. SS register)
     // which is required for restoring context
-    RtlCaptureContext(&context);
+    RtlCaptureContext(contextRecord);
 
     // Fill context record with required information. from pal.h:
     // On non-Win32 platforms, the CONTEXT pointer in the
     // PEXCEPTION_POINTERS will contain at least the CONTEXT_CONTROL registers.
-    CONTEXTFromNativeContext(ucontext, &context, CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_FLOATING_POINT);
-
-    pointers.ContextRecord = &context;
+    CONTEXTFromNativeContext(ucontext, contextRecord, CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_FLOATING_POINT);
 
     /* Unmask signal so we can receive it again */
     sigemptyset(&signal_set);
@@ -614,7 +619,7 @@ static void common_signal_handler(int code, siginfo_t *siginfo, void *sigcontext
         ASSERT("pthread_sigmask failed; error number is %d\n", sigmaskRet);
     }
 
-    SEHProcessException(&pointers);
+    SEHProcessException(exceptionRecord, contextRecord);
 }
 
 /*++

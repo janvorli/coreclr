@@ -476,12 +476,13 @@ typedef long time_t;
 #define DLL_THREAD_DETACH  3
 #define DLL_PROCESS_DETACH 0
 
-#define PAL_INITIALIZE_NONE                         0x00
-#define PAL_INITIALIZE_SYNC_THREAD                  0x01
-#define PAL_INITIALIZE_EXEC_ALLOCATOR               0x02
-#define PAL_INITIALIZE_STD_HANDLES                  0x04
-#define PAL_INITIALIZE_REGISTER_SIGTERM_HANDLER     0x08
-#define PAL_INITIALIZE_DEBUGGER_EXCEPTIONS          0x10
+#define PAL_INITIALIZE_NONE                                 0x00
+#define PAL_INITIALIZE_SYNC_THREAD                          0x01
+#define PAL_INITIALIZE_EXEC_ALLOCATOR                       0x02
+#define PAL_INITIALIZE_STD_HANDLES                          0x04
+#define PAL_INITIALIZE_REGISTER_SIGTERM_HANDLER             0x08
+#define PAL_INITIALIZE_DEBUGGER_EXCEPTIONS                  0x10
+#define PAL_INITIALIZE_REGISTER_HARDWARE_EXCEPTION_HANDLERS 0x20
 
 // PAL_Initialize() flags
 #define PAL_INITIALIZE                 (PAL_INITIALIZE_SYNC_THREAD | PAL_INITIALIZE_STD_HANDLES)
@@ -490,7 +491,11 @@ typedef long time_t;
 #define PAL_INITIALIZE_DLL             PAL_INITIALIZE_NONE       
 
 // PAL_InitializeCoreCLR() flags
-#define PAL_INITIALIZE_CORECLR         (PAL_INITIALIZE | PAL_INITIALIZE_EXEC_ALLOCATOR | PAL_INITIALIZE_REGISTER_SIGTERM_HANDLER | PAL_INITIALIZE_DEBUGGER_EXCEPTIONS)
+#define PAL_INITIALIZE_CORECLR         (PAL_INITIALIZE |                                    \
+                                        PAL_INITIALIZE_EXEC_ALLOCATOR |                     \
+                                        PAL_INITIALIZE_REGISTER_SIGTERM_HANDLER |           \
+                                        PAL_INITIALIZE_DEBUGGER_EXCEPTIONS |                \
+                                        PAL_INITIALIZE_REGISTER_HARDWARE_EXCEPTION_HANDLERS)
 
 typedef DWORD (PALAPI *PTHREAD_START_ROUTINE)(LPVOID lpThreadParameter);
 typedef PTHREAD_START_ROUTINE LPTHREAD_START_ROUTINE;
@@ -6442,6 +6447,13 @@ public:
 
 #include "pal_unwind.h"
 
+PALIMPORT
+VOID
+PALAPI
+PAL_FreeExceptionRecords(
+  IN EXCEPTION_RECORD *exceptionRecord, 
+  IN CONTEXT *contextRecord);
+
 #define EXCEPTION_CONTINUE_SEARCH   0
 #define EXCEPTION_EXECUTE_HANDLER   1
 #define EXCEPTION_CONTINUE_EXECUTION -1
@@ -6481,14 +6493,14 @@ public:
         ex.ExceptionPointers.ContextRecord = NULL;
     }    
 
-    
     ~PAL_SEHException()
     {
-        free(ExceptionPointers.ExceptionRecord);
-        ExceptionPointers.ExceptionRecord = NULL;
-
-        free(ExceptionPointers.ContextRecord);
-        ExceptionPointers.ContextRecord = NULL;
+        if (ExceptionPointers.ExceptionRecord != NULL)
+        {
+            PAL_FreeExceptionRecords(ExceptionPointers.ExceptionRecord, ExceptionPointers.ContextRecord);
+            ExceptionPointers.ExceptionRecord = NULL;
+            ExceptionPointers.ContextRecord = NULL;
+        }
     }
 
     CONTEXT* GetContextRecord()
