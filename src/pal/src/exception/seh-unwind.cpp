@@ -558,6 +558,16 @@ BOOL PAL_VirtualUnwindOutOfProc(CONTEXT *context,
 #endif // !HAVE_UNW_GET_ACCESSORS
 #endif // _AMD64_
 
+struct ExceptionRecords
+{
+    CONTEXT ContextRecord;
+    EXCEPTION_RECORD ExceptionRecord;
+};
+
+static const int MaxFallbackContexts = sizeof(size_t) * 8;
+static ExceptionRecords s_fallbackContexts[MaxFallbackContexts];
+static volatile size_t s_allocatedContextsBitmap = 0;
+
 /*++
 Function:
     AllocateExceptionRecords
@@ -570,16 +580,34 @@ Parameters:
 VOID
 AllocateExceptionRecords(EXCEPTION_RECORD** exceptionRecord, CONTEXT** contextRecord)
 {
-    void* records = aligned_alloc(alignof(CONTEXT), sizeof(CONTEXT) + sizeof(EXCEPTION_RECORD));
+    ExceptionRecords* records = (ExceptionRecords*)aligned_alloc(alignof(ExceptionRecords), sizeof(ExceptionRecords));
     if (records == NULL)
     {
-        // TODO: use a predefined buffer? 
+        // TODO: use a predefined buffer? AMD64 context size is 0x4D0
         // Options - TLS of multiple contexts per thread - scales with number of threads
         //         - global memory range
+        size_t bitmap;
+        size_t newBitmap;
+        int index;
+
+        do
+        {
+            bitmap = s_allocatedContextsBitmap;
+            index = __builtin_ffsl(~bitmap) - 1;
+            if (index < 0)
+            {
+                PROCAbort();
+            }
+
+            newBitmap = bitmap | ((size_t)1 << index);
+        }
+        while (__sync_val_compare_and_swap(&s_allocatedContextsBitmap, bitmap, newBitmap) != bitmap);
+
+        records = &s_fallbackContexts[index];
     }
 
-    *contextRecord = (CONTEXT*)records;
-    *exceptionRecord = (EXCEPTION_RECORD*)(*contextRecord + 1);
+    *contextRecord = &records->ContextRecord;
+    *exceptionRecord = &records->ExceptionRecord;
 }
 
 /*++
@@ -597,7 +625,16 @@ PALAPI
 PAL_FreeExceptionRecords(IN EXCEPTION_RECORD *exceptionRecord, IN CONTEXT *contextRecord)
 {
     // Both records are allocated at once and the allocated memory starts at the contextRecord
-    free(contextRecord);
+    ExceptionRecords* records = (ExceptionRecords*)contextRecord;
+    if ((records >= &s_fallbackContexts[0]) && (records < &s_fallbackContexts[MaxFallbackContexts]))
+    {
+        int index = records - &s_fallbackContexts[0];
+        __sync_fetch_and_and(&s_allocatedContextsBitmap, ~((size_t)1 << index));
+    }
+    else
+    {
+        free(contextRecord);
+    }
 }
 
 /*++

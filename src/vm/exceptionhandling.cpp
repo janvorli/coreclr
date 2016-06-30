@@ -4418,10 +4418,6 @@ VOID UnwindManagedExceptionPass2(PAL_SEHException& ex, CONTEXT* unwindStartConte
             if (establisherFrame == ex.TargetFrameSp)
             {
                 // We have reached the frame that will handle the exception.
-                // The following ProcessCLRException will not return and will jump to the exception handler
-                // instead. So we need to destroy the exception object here in order to release the context
-                // and exception records it points to.
-                // We need to make a copy of the ExceptionRecord for the ProcessCLRException though
                 ex.GetExceptionRecord()->ExceptionFlags |= EXCEPTION_TARGET_UNWIND;
             }
 

@@ -6462,6 +6462,27 @@ struct PAL_SEHException
 {
 private:
     static const SIZE_T NoTargetFrameSp = SIZE_MAX;
+
+    void Move(PAL_SEHException& ex)
+    {
+        ExceptionPointers.ExceptionRecord = ex.ExceptionPointers.ExceptionRecord;
+        ExceptionPointers.ContextRecord = ex.ExceptionPointers.ContextRecord;
+        TargetFrameSp = ex.TargetFrameSp;
+
+        ex.ExceptionPointers.ExceptionRecord = NULL;
+        ex.ExceptionPointers.ContextRecord = NULL;
+    }
+
+    void FreeRecords()
+    {
+        if (ExceptionPointers.ExceptionRecord != NULL)
+        {
+            PAL_FreeExceptionRecords(ExceptionPointers.ExceptionRecord, ExceptionPointers.ContextRecord);
+            ExceptionPointers.ExceptionRecord = NULL;
+            ExceptionPointers.ContextRecord = NULL;
+        }
+    }
+
 public:
     EXCEPTION_POINTERS ExceptionPointers;
     // Target frame stack pointer set before the 2nd pass.
@@ -6481,26 +6502,28 @@ public:
         TargetFrameSp = NoTargetFrameSp;
     }    
 
+    // The copy constructor and copy assignment operators are deleted so that 
+    // the exception is never copied, only moved. This enables simple lifetime
+    // management of the exception and context records, since there is always
+    // just one PAL_SEHException instance referring to the same records.
     PAL_SEHException(const PAL_SEHException& ex) = delete;
+    PAL_SEHException& operator=(const PAL_SEHException& ex) = delete;
 
     PAL_SEHException(PAL_SEHException&& ex)
     {
-        ExceptionPointers.ExceptionRecord = ex.ExceptionPointers.ExceptionRecord;
-        ExceptionPointers.ContextRecord = ex.ExceptionPointers.ContextRecord;
-        TargetFrameSp = ex.TargetFrameSp;
-
-        ex.ExceptionPointers.ExceptionRecord = NULL;
-        ex.ExceptionPointers.ContextRecord = NULL;
+        Move(ex);
     }    
+
+    PAL_SEHException& operator=(PAL_SEHException&& ex)
+    {
+        FreeRecords();
+        Move(ex);
+        return *this;
+    }
 
     ~PAL_SEHException()
     {
-        if (ExceptionPointers.ExceptionRecord != NULL)
-        {
-            PAL_FreeExceptionRecords(ExceptionPointers.ExceptionRecord, ExceptionPointers.ContextRecord);
-            ExceptionPointers.ExceptionRecord = NULL;
-            ExceptionPointers.ContextRecord = NULL;
-        }
+        FreeRecords();
     }
 
     CONTEXT* GetContextRecord()
@@ -6521,18 +6544,6 @@ public:
     void SecondPassDone()
     {
         TargetFrameSp = NoTargetFrameSp;
-    }
-
-    PAL_SEHException& operator=(PAL_SEHException&& ex)
-    {
-        ExceptionPointers.ExceptionRecord = ex.ExceptionPointers.ExceptionRecord;
-        ExceptionPointers.ContextRecord = ex.ExceptionPointers.ContextRecord;
-        TargetFrameSp = ex.TargetFrameSp;
-
-        ex.ExceptionPointers.ExceptionRecord = NULL;
-        ex.ExceptionPointers.ContextRecord = NULL;
-
-        return *this;
     }
 };
 
