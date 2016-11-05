@@ -50,7 +50,7 @@ PAL_wcsstr
 _wcsicmp
 _stricmp
 _snprintf
-_snwprintf
+swprintf_s
 _vsnwprintf
 _itow_s
 _i64tow_s
