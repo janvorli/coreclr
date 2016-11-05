@@ -33,7 +33,7 @@ Abstract:
 #include <string.h>
 #include <errno.h>
 
-#define snprintf _snprintf
+#define snprintf _snprintf_s
 #define MiscGetenv getenv
 #define pthread_getspecific TlsGetValue
 #define THREADSilentGetCurrentThreadId GetCurrentThreadId
