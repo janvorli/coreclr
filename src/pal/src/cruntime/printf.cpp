@@ -1531,33 +1531,6 @@ PAL_vswprintf(wchar_16 *buffer,
 }
 
 
-/*++
-Function:
-  _vsnwprintf
-
-See MSDN doc.
---*/
-int 
-__cdecl 
-_vsnwprintf(wchar_16 *buffer, 
-            size_t count, 
-            const wchar_16 *format, 
-            va_list argptr)
-{
-    LONG Length;
-
-    PERF_ENTRY(_vsnwprintf);
-    ENTRY("_vsnwprintf (buffer=%p, count=%lu, format=%p (%S), argptr=%p)\n", 
-          buffer, (unsigned long) count, format, format, argptr);
-	
-    Length = PAL__wvsnprintf(buffer, count, format, argptr);
-
-    LOGEXIT("_vsnwprintf returns int %d\n", Length);
-    PERF_EXIT(_vsnwprintf);
-
-    return Length;
-}
-
 #if SSCANF_CANNOT_HANDLE_MISSING_EXPONENT
 /*++
 Function:

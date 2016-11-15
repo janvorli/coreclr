@@ -154,7 +154,7 @@ void NearDiffer::DumpCodeBlock(unsigned char *block, ULONG blocksize, void *orig
 
         const size_t minInstrBytes = 7;
         size_t instrBytes = max(instrSize, minInstrBytes);
-        size_t buffSize = strlen("%p %s\n") + 10 + strlen(instrMnemonic) + 3 * instrBytes + 1;
+        size_t buffSize = sizeof("%p %s\n") + 10 + count + 3 * instrBytes + 1;
         char *buff = new char[buffSize];
         int written = 0;
         written += sprintf_s(buff, buffSize, "%p ", (void*)((size_t)originalAddr+offset));

@@ -857,6 +857,12 @@ int __cdecl _output (
                     flags |= FL_LONG;   /* 'l' => long int or wchar_t */
                 }
                 break;
+            case _T('L'):
+                if (*format == _T('p'))
+                {
+                    flags |= FL_LONG;   
+                }
+                break;
 
             case _T('I'):
                 /*
@@ -1172,7 +1178,15 @@ int __cdecl _output (
 
                 precision = 2 * sizeof(void *);     /* number of hex digits needed */
 #if PTR_IS_INT64
-                flags |= FL_I64;                    /* assume we're converting an int64 */
+                if (flags & (FL_LONG | FL_SHORT))
+                {
+                    /* %lp, %Lp or %hp - these print 8 hex digits*/
+                    precision = 2 * sizeof(int32_t);
+                }
+                else
+                {
+                    flags |= FL_I64;                /* assume we're converting an int64 */
+                }
 #elif !PTR_IS_INT
                 flags |= FL_LONG;                   /* assume we're converting a long */
 #endif  /* !PTR_IS_INT */

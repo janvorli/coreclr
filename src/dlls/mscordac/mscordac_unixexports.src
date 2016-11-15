@@ -49,9 +49,9 @@ PAL_wcsstr
 
 _wcsicmp
 _stricmp
-sprintf_s
-swprintf_s
-_vsnwprintf
+vsprintf_s
+vswprintf_s
+_vsnwprintf_s
 _itow_s
 _i64tow_s
 memcpy_s
