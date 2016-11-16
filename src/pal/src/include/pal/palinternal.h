@@ -183,9 +183,6 @@ function_name() to call the system's implementation
 #define strpbrk DUMMY_strpbrk
 #define strtod DUMMY_strtod
 #define strspn DUMMY_strspn
-#if HAVE__SNPRINTF
-#define _snprintf DUMMY__snprintf
-#endif /* HAVE__SNPRINTF */
 #define tolower DUMMY_tolower
 #define toupper DUMMY_toupper
 #define islower DUMMY_islower
@@ -507,7 +504,6 @@ function_name() to call the system's implementation
 #undef wprintf
 #undef sprintf
 #undef swprintf
-#undef _snprintf
 #undef sscanf
 #undef wcstod
 #undef wcstol

@@ -5854,7 +5854,7 @@ PALIMPORT errno_t __cdecl memcpy_s(void *, size_t, const void *, size_t);
 PALIMPORT errno_t __cdecl memmove_s(void *, size_t, const void *, size_t);
 PALIMPORT char * __cdecl _strlwr(char *);
 PALIMPORT int __cdecl _stricmp(const char *, const char *);
-PALIMPORT int __cdecl _snprintf(char *, size_t, const char *, ...);
+PALIMPORT int __cdecl sprintf_s(char *, size_t, const char *, ...);
 PALIMPORT char * __cdecl _gcvt_s(char *, int, double, int);
 PALIMPORT char * __cdecl _ecvt(double, int, int *, int *);
 PALIMPORT int __cdecl __iscsym(int);

@@ -277,37 +277,6 @@ PAL_vprintf(
 
 /*++
 Function:
-  _snprintf
-
-See MSDN doc.
---*/
-int
-__cdecl
-_snprintf(
-     char *buffer,
-     size_t count,
-     const char *format,
-     ...)
-{
-    LONG Length;
-    va_list ap;
-
-    PERF_ENTRY(_snprintf);
-    ENTRY("_snprintf (buffer=%p, count=%lu, format=%p (%s))\n",
-          buffer, (unsigned long) count, format, format);
-
-    va_start(ap, format);
-    Length = InternalVsnprintf(CorUnix::InternalGetCurrentThread(), buffer, count, format, ap);
-    va_end(ap);
-
-    LOGEXIT("_snprintf returns int %d\n", Length);
-    PERF_EXIT(_snprintf);
-    return Length;
-} 
-
-
-/*++
-Function:
   fwprintf
 
 See MSDN doc.

@@ -49,7 +49,7 @@ PAL_wcsstr
 
 _wcsicmp
 _stricmp
-_snprintf
+sprintf_s
 swprintf_s
 _vsnwprintf
 _itow_s

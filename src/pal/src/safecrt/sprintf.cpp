@@ -8,7 +8,7 @@
 
 *
 *Purpose:
-*       defines sprintf() and _snprintf() - print formatted data to string
+*       defines sprintf_s() and _snprintf_s() - print formatted data to string
 *
 *******************************************************************************/
 
@@ -22,9 +22,9 @@
 
 /***
 *ifndef _COUNT_
-*int sprintf(string, format, ...) - print formatted data to string
+*int sprintf_s(string, format, ...) - print formatted data to string
 *else
-*int _snprintf(string, cnt, format, ...) - print formatted data to string
+*int _snprintf_s(string, cnt, format, ...) - print formatted data to string
 *endif
 *
 *Purpose:
@@ -40,7 +40,7 @@
 *       entries are in are in DGROUP and, thus, are near.
 *
 *ifdef _COUNT_
-*       The _snprintf() flavor takes a count argument that is
+*       The _snprintf_s() flavor takes a count argument that is
 *       the max number of bytes that should be written to the
 *       user's buffer.
 *endif
