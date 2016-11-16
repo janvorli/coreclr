@@ -530,7 +530,6 @@ function_name() to call the system's implementation
 #undef vsprintf
 #undef vswprintf
 #undef _vsnprintf
-#undef _vsnwprintf
 #undef vsnprintf
 #undef wvsnprintf
 

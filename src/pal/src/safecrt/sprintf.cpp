@@ -76,7 +76,7 @@ int sprintf_s (
         int ret;
         va_list arglist;
         va_start(arglist, format);
-        ret = _vsprintf_s(string, sizeInBytes, format, arglist);
+        ret = vsprintf_s(string, sizeInBytes, format, arglist);
         va_end(arglist);
         return ret;
 }
