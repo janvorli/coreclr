@@ -176,16 +176,6 @@ UINT64 GetHighPrecisionTimeStamp(LARGE_INTEGER performanceFrequency)
     return ts.QuadPart / (performanceFrequency.QuadPart / 1000);    
 }
 
-int __cdecl sprintf_s(char *_Dst, size_t _SizeInBytes, const char *_Format, ...)
-{
-    int ret;
-    va_list _ArgList;
-    va_start(_ArgList, _Format);
-    ret = vsprintf_s(_Dst, _SizeInBytes, _Format, _ArgList);
-    va_end(_ArgList);
-    return ret;
-}
-
 #endif
 
 

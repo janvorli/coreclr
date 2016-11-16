@@ -5869,7 +5869,13 @@ PALIMPORT unsigned char * __cdecl _mbsdec(const unsigned char *, const unsigned 
 PALIMPORT int __cdecl _wcsicmp(const WCHAR *, const WCHAR*);
 PALIMPORT int __cdecl _wcsnicmp(const WCHAR *, const WCHAR *, size_t);
 PALIMPORT int __cdecl _vsnprintf(char *, size_t, const char *, va_list);
+PALIMPORT int __cdecl _vsnprintf_s(char *, size_t, size_t, const char *, va_list);
 PALIMPORT int __cdecl _vsnwprintf_s(WCHAR *, size_t, size_t, const WCHAR *, va_list);
+PALIMPORT int __cdecl _snwprintf_s(WCHAR *, size_t, size_t, const WCHAR *, ...);
+PALIMPORT int __cdecl _snprintf_s(char *, size_t, size_t, const char *, ...);
+PALIMPORT int __cdecl sprintf_s(char *, size_t, const char *, ... );
+PALIMPORT int __cdecl swprintf_s(WCHAR *, size_t, const WCHAR *, ... );
+PALIMPORT int __cdecl _snwprintf_s(WCHAR *, size_t, size_t, const WCHAR *, ...);
 PALIMPORT int __cdecl vswprintf_s( WCHAR *, size_t, const WCHAR *, va_list);
 PALIMPORT errno_t __cdecl _itow_s(int, WCHAR *, size_t, int);
 

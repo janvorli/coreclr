@@ -3181,18 +3181,9 @@ error_erange:
  * cannot be used without safecrt.lib
  */
 _SAFECRT__EXTERN_C
+int __cdecl sprintf_s(char *_Dst, size_t _SizeInBytes, const char *_Format, ...);
+_SAFECRT__EXTERN_C
 int __cdecl vsprintf_s(char *_Dst, size_t _SizeInBytes, const char *_Format, va_list _ArgList);
-
-inline
-int __cdecl sprintf_s(char *_Dst, size_t _SizeInBytes, const char *_Format, ...)
-{
-    int ret;
-    va_list _ArgList;
-    va_start(_ArgList, _Format);
-    ret = vsprintf_s(_Dst, _SizeInBytes, _Format, _ArgList);
-    va_end(_ArgList);
-    return ret;
-}
 
 #if defined(__cplusplus) && _SAFECRT_USE_CPP_OVERLOADS
 template <size_t _SizeInBytes>
@@ -3219,18 +3210,9 @@ int __cdecl vsprintf_s(char (&_Dst)[_SizeInBytes], const char *_Format, va_list 
 
 /* swprintf_s, vswprintf_s */
 _SAFECRT__EXTERN_C
+int __cdecl swprintf_s(WCHAR *_Dst, size_t _SizeInWords, const WCHAR *_Format, ...);
+_SAFECRT__EXTERN_C
 int __cdecl vswprintf_s(WCHAR *_Dst, size_t _SizeInWords, const WCHAR *_Format, va_list _ArgList);
-
-inline
-int __cdecl swprintf_s(WCHAR *_Dst, size_t _SizeInWords, const WCHAR *_Format, ...)
-{
-    int ret;
-    va_list _ArgList;
-    va_start(_ArgList, _Format);
-    ret = vswprintf_s(_Dst, _SizeInWords, _Format, _ArgList);
-    va_end(_ArgList);
-    return ret;
-}
 
 #if defined(__cplusplus) && _SAFECRT_USE_CPP_OVERLOADS
 template <size_t _SizeInWords>
@@ -3302,16 +3284,6 @@ int __cdecl _vsnprintf_s(char (&_Dst)[_SizeInBytes], size_t _Count, const char *
 /* _snwprintf_s, _vsnwprintf_s */
 _SAFECRT__EXTERN_C
 int __cdecl _vsnwprintf_s(WCHAR *_Dst, size_t _SizeInWords, size_t _Count, const WCHAR *_Format, va_list _ArgList);
-
-inline int __cdecl _snwprintf_s(WCHAR *_Dst, size_t _SizeInWords, size_t _Count, const WCHAR *_Format, ...)
-{
-    int ret;
-    va_list _ArgList;
-    va_start(_ArgList, _Format);
-    ret = _vsnwprintf_s(_Dst, _SizeInWords, _Count, _Format, _ArgList);
-    va_end(_ArgList);
-    return ret;    
-}
 
 #if defined(__cplusplus) && _SAFECRT_USE_CPP_OVERLOADS
 template <size_t _SizeInWords>

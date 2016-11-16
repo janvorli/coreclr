@@ -894,7 +894,6 @@ Remember to fix the errcode defintion in safecrt.h.
 
 #define _wcslwr_s _wcslwr_unsafe
 #define _snprintf_s _snprintf_unsafe
-#define _vsnprintf_s _vsnprintf_unsafe
 #define swscanf_s swscanf
 #define sscanf_s sscanf
 

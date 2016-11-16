@@ -962,7 +962,11 @@ int __cdecl _output (
 #else  /* _UNICODE */
                 if (flags & (FL_LONG|FL_WIDECHAR)) {
                     wchar = (wchar_t) get_int_arg(&argptr);
-                    no_output = 1;
+                    textlen = snprintf(buffer.sz, BUFFERSIZE, "%lc", wchar);
+                    if (textlen == 0)
+                    {
+                        no_output = 1;
+                    }
                 } else {
                     /* format multibyte character */
                     /* this is an extension of ANSI */
@@ -1385,7 +1389,22 @@ int __cdecl _output (
                 /* write text */
 #ifndef _UNICODE
                 if (bufferiswide && (textlen > 0)) {
-                    charsout = -1;
+                    const WCHAR *p;
+                    int mbCharCount;
+                    int count;
+                    char mbStr[5];
+
+                    p = text.wz;
+                    count = textlen;
+                    while (count-- > 0) {
+                        mbCharCount = snprintf(mbStr, sizeof(mbStr), "%lc", *p);
+                        if (mbCharCount == 0) {
+                            charsout = -1;
+                            break;
+                        }
+                        WRITE_STRING(mbStr, mbCharCount, &charsout);
+                        p++;
+                    }
                 } else {
                     WRITE_STRING(text.sz, textlen, &charsout);
                 }
