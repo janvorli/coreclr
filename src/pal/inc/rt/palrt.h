@@ -849,8 +849,6 @@ STDAPI_(LPWSTR) StrCatBuffW(LPWSTR pszDest, LPCWSTR pszSrc, int cchDestBuffSize)
 
 #define lstrcmpW                PAL_wcscmp
 #define lstrcmpiW               _wcsicmp
-#define wnsprintfW              _snwprintf // note: not 100% compatible (wsprintf should be subset of sprintf...)
-#define wvnsprintfW             _vsnwprintf // note: not 100% compatible (wsprintf should be subset of sprintf...)
 
 #ifdef UNICODE
 #define StrCpy                  StrCpyW
@@ -869,7 +867,6 @@ STDAPI_(LPWSTR) StrCatBuffW(LPWSTR pszDest, LPCWSTR pszSrc, int cchDestBuffSize)
 
 #define lstrcmp                 lstrcmpW
 #define lstrcmpi                lstrcmpiW
-#define wnsprintf               wnsprintfW
 #endif
 
 
@@ -912,7 +909,6 @@ Remember to fix the errcode defintion in safecrt.h.
 #define _vscwprintf _vscwprintf_unsafe
 
 #define sprintf_s _snprintf
-#define swprintf_s _snwprintf
 #define vsprintf_s _vsnprintf
 #define vswprintf_s _vsnwprintf
 

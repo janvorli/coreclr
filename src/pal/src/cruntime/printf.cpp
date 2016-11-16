@@ -308,36 +308,6 @@ _snprintf(
 
 /*++
 Function:
-  _snwprintf
-
-See MSDN doc.
---*/
-int
-__cdecl
-_snwprintf(
-     wchar_16 *buffer,
-     size_t count,
-     const wchar_16 *format,
-     ...)
-{
-    LONG Length;
-    va_list ap;
-
-    PERF_ENTRY(_snwprintf);
-    ENTRY("_snwprintf (buffer=%p, count=%lu, format=%p (%S))\n",
-          buffer, (unsigned long) count, format, format);
-
-    va_start(ap, format);
-    Length = PAL__wvsnprintf(buffer, count, format, ap);
-    va_end(ap);
-
-    LOGEXIT("_snwprintf returns int %d\n", Length);
-    PERF_EXIT(_snwprintf);
-    return Length;
-}
-
-/*++
-Function:
   fwprintf
 
 See MSDN doc.
