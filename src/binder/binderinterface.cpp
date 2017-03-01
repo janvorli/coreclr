@@ -48,7 +48,7 @@ namespace BinderInterface
         EX_TRY
         {
             BINDER_LOG_LOCK();
-            BINDER_LOG_ENTER(L"BinderInterface::SetupContext");
+            BINDER_LOG_ENTER(W("BinderInterface::SetupContext"));
 
             // Verify input arguments
             IF_FALSE_GO(ppIApplicationContext != NULL);
@@ -63,7 +63,7 @@ namespace BinderInterface
             }
 
         Exit:
-            BINDER_LOG_LEAVE_HR(L"BinderInterface::SetupContext", hr);
+            BINDER_LOG_LEAVE_HR(W("BinderInterface::SetupContext"), hr);
         }
         EX_CATCH_HRESULT(hr);
 
@@ -86,7 +86,7 @@ namespace BinderInterface
         EX_TRY
         {
             BINDER_LOG_LOCK();
-            BINDER_LOG_ENTER(L"BinderInterface::Bind");
+            BINDER_LOG_ENTER(W("BinderInterface::Bind"));
             
             // Verify input arguments
             IF_FALSE_GO(pIApplicationContext != NULL);
@@ -114,7 +114,7 @@ namespace BinderInterface
             }
 
         Exit:
-            BINDER_LOG_LEAVE_HR(L"BinderInterface::Bind", hr);
+            BINDER_LOG_LEAVE_HR(W("BinderInterface::Bind"), hr);
         }
         EX_CATCH_HRESULT(hr);
 
@@ -152,7 +152,7 @@ namespace BinderInterface
         EX_TRY
         {
             BINDER_LOG_LOCK();
-            BINDER_LOG_ENTER(L"BinderInterface::SetupBindingPaths");
+            BINDER_LOG_ENTER(W("BinderInterface::SetupBindingPaths"));
 
             // Verify input arguments
             IF_FALSE_GO(pIApplicationContext != NULL);
@@ -166,7 +166,7 @@ namespace BinderInterface
             }
 
         Exit:
-            BINDER_LOG_LEAVE_HR(L"BinderInterface::SetupBindingPaths", hr);
+            BINDER_LOG_LEAVE_HR(W("BinderInterface::SetupBindingPaths"), hr);
         }
         EX_CATCH_HRESULT(hr);
 

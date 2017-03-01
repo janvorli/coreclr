@@ -4,6 +4,8 @@ else()
   set(CLR_BUILD_JIT32 0)  
 endif()  
 
+add_definitions(-DBINDER_DEBUG_LOG)
+
 if (WIN32)
   set(FEATURE_EVENT_TRACE 1)
 endif()

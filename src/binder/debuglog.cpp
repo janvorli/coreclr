@@ -31,28 +31,28 @@ namespace BINDER_SPACE
             switch(hr)
             {
             case S_OK:
-                info.Append(L"S_OK");
+                info.Append(W("S_OK"));
                 break;
             case S_FALSE:
-                info.Append(L"S_FALSE");
+                info.Append(W("S_FALSE"));
                 break;
             case E_FAIL:
-                info.Append(L"E_FAIL");
+                info.Append(W("E_FAIL"));
                 break;
             case __HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND):
-                info.Append(L"HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)");
+                info.Append(W("HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)"));
                 break;
             case __HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER):
-                info.Append(L"HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER)");
+                info.Append(W("HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER)"));
                 break;
             case FUSION_E_REF_DEF_MISMATCH:
-                info.Append(L"FUSION_E_REF_DEF_MISMATCH");
+                info.Append(W("FUSION_E_REF_DEF_MISMATCH"));
                 break;
             case FUSION_E_CODE_DOWNLOAD_DISABLED:
-                info.Append(L"FUSION_E_CODE_DOWNLOAD_DISABLED");
+                info.Append(W("FUSION_E_CODE_DOWNLOAD_DISABLED"));
                 break;
             default:
-                info.AppendPrintf(L"%p", hr);
+                info.AppendPrintf(W("%p"), hr);
                 break;
             }
         }
@@ -81,7 +81,7 @@ namespace BINDER_SPACE
                 }
                 else
                 {
-                    logFilePath.Printf(L"%s\\Log_%u%u_%u%u.tmp",
+                    logFilePath.Printf(W("%s\\Log_%u%u_%u%u.tmp"),
                                        logFileDir.GetUnicode(),
                                        static_cast<UINT32>(kCount1.u.LowPart),
                                        kCount1.u.HighPart,
@@ -181,7 +181,7 @@ namespace BINDER_SPACE
     static const ANSI s_szScopeIndent[3] = "  ";
     
     /* static */
-    void DebugLog::Enter(WCHAR *pwzScope)
+    void DebugLog::Enter(const WCHAR *pwzScope)
     {
         HRESULT hr = S_OK;
 
@@ -190,7 +190,7 @@ namespace BINDER_SPACE
             PathString info;
 
             info.Append(pwzScope);
-            info.Append(L": Enter");
+            info.Append(W(": Enter"));
             Log(info);
         }
         EX_CATCH_HRESULT(hr);
@@ -199,7 +199,7 @@ namespace BINDER_SPACE
     }
 
     /* static */
-    void DebugLog::Leave(WCHAR *pwzScope)
+    void DebugLog::Leave(const WCHAR *pwzScope)
     {
         HRESULT hr = S_OK;
         
@@ -210,14 +210,14 @@ namespace BINDER_SPACE
             PathString info;
 
             info.Append(pwzScope);
-            info.Append(L": Leave(void)");
+            info.Append(W(": Leave(void)"));
             Log(info);
         }
         EX_CATCH_HRESULT(hr);
     }
 
     /* static */
-    void DebugLog::LeaveHR(WCHAR   *pwzScope,
+    void DebugLog::LeaveHR(const WCHAR   *pwzScope,
                            HRESULT  hrLog)
     {
         HRESULT hr = S_OK;
@@ -229,9 +229,9 @@ namespace BINDER_SPACE
             PathString info;
 
             info.Append(pwzScope);
-            info.Append(L": Leave(hr=");
+            info.Append(W(": Leave(hr="));
             GetStringFromHR(hrLog, info);
-            info.Append(L")");
+            info.Append(W(")"));
 
             Log(info);
         }
@@ -239,7 +239,7 @@ namespace BINDER_SPACE
     }
 
     /* static */
-    void DebugLog::LeaveBool(WCHAR   *pwzScope,
+    void DebugLog::LeaveBool(const WCHAR   *pwzScope,
                              BOOL     fResult)
     {
         HRESULT hr = S_OK;
@@ -251,15 +251,15 @@ namespace BINDER_SPACE
             PathString info;
 
             info.Append(pwzScope);
-            info.Append(L": Leave(fResult=");
-            info.Append(fResult ? L"TRUE)" : L"FALSE)");
+            info.Append(W(": Leave(fResult="));
+            info.Append(fResult ? W("TRUE") : W("FALSE"));
             Log(info);
         }
         EX_CATCH_HRESULT(hr);
     }
 
     /* static */
-    void DebugLog::Log(WCHAR *pwzComment)
+    void DebugLog::Log(const WCHAR *pwzComment)
     {
         HRESULT hr = S_OK;
 
@@ -274,7 +274,7 @@ namespace BINDER_SPACE
     }
 
     /* static */
-    void DebugLog::Log(WCHAR   *pwzComment,
+    void DebugLog::Log(const WCHAR   *pwzComment,
                        SString &value)
     {
         HRESULT hr = S_OK;
@@ -284,9 +284,9 @@ namespace BINDER_SPACE
             PathString info;
 
             info.Append(pwzComment);
-            info.Append(L" = '");
+            info.Append(W(" = '"));
             info.Append(value);
-            info.Append(L"'");
+            info.Append(W("'"));
 
             Log(info);
         }
@@ -294,7 +294,7 @@ namespace BINDER_SPACE
     }
 
     /* static */
-    void DebugLog::Log(WCHAR   *pwzComment,
+    void DebugLog::Log(const WCHAR   *pwzComment,
                        const WCHAR   *value)
     {
         HRESULT hr = S_OK;
@@ -304,9 +304,9 @@ namespace BINDER_SPACE
             PathString info;
 
             info.Append(pwzComment);
-            info.Append(L" = '");
+            info.Append(W(" = '"));
             info.Append(value);
-            info.Append(L"'");
+            info.Append(W("'"));
 
             Log(info);
         }
@@ -314,7 +314,7 @@ namespace BINDER_SPACE
     }
     
     /* static */
-    void DebugLog::Log(WCHAR   *pwzComment,
+    void DebugLog::Log(const WCHAR   *pwzComment,
                        HRESULT  hrLog)
     {
         HRESULT hr = S_OK;
@@ -324,7 +324,7 @@ namespace BINDER_SPACE
             PathString info;
 
             info.Append(pwzComment);
-            info.Append(L" = ");
+            info.Append(W(" = "));
             GetStringFromHR(hrLog, info);
         
             Log(info);
@@ -333,7 +333,7 @@ namespace BINDER_SPACE
     }
 
     /* static */
-    void DebugLog::Log(WCHAR        *pwzComment,
+    void DebugLog::Log(const WCHAR        *pwzComment,
                        AssemblyName *pAssemblyName)
     {
         EX_TRY
@@ -350,23 +350,23 @@ namespace BINDER_SPACE
             }
             else
             {
-                assemblyDisplayName.Set(L"<NULL>");
+                assemblyDisplayName.Set(W("<NULL>"));
             }
 
-            info.Printf(L"(%d):", static_cast<INT32>(assemblyDisplayName.GetCount()));
+            info.Printf(W("(%d):"), static_cast<INT32>(assemblyDisplayName.GetCount()));
             info.Append(assemblyDisplayName);
 
             Log(pwzComment, info);
         }
         EX_CATCH
         {
-            Log(L"<AssemblyDisplayName: Failure>");
+            Log(W("<AssemblyDisplayName: Failure>"));
         }
         EX_END_CATCH(SwallowAllExceptions);
     }
 
     /* static */
-    void DebugLog::Log(WCHAR *pwzComment,
+    void DebugLog::Log(const WCHAR *pwzComment,
                        void  *pData)
     {
         HRESULT hr = S_OK;
@@ -376,7 +376,7 @@ namespace BINDER_SPACE
             PathString info;
 
             info.Append(pwzComment);
-            info.AppendPrintf(L" = %p", pData);
+            info.AppendPrintf(W(" = %p"), pData);
             Log(info);
         }
         EX_CATCH_HRESULT(hr);
@@ -393,7 +393,7 @@ namespace BINDER_SPACE
         // Work around SString issue
         const ANSI ansiCRLF[] = { 0x0d, 0x0a };
         DWORD dwcbAnsiCRLF = 2 * sizeof(ANSI);
-        s_scopeLevel;
+        //s_scopeLevel;
         for (int iScope = 0; iScope < s_scopeLevel; iScope++)
         {
             IF_FAIL_GO(WriteToFile(g_BinderVariables->m_hDebugLogFile, reinterpret_cast<const BYTE *>(&s_szScopeIndent[0]), sizeof(s_szScopeIndent)));
@@ -405,7 +405,7 @@ namespace BINDER_SPACE
         // Don't cache anything
         if (!FlushFileBuffers(g_BinderVariables->m_hDebugLogFile))
         {
-            WszOutputDebugString(L"DebugLog::Log(info): FlushFileBuffers failed!\n");
+            WszOutputDebugString(W("DebugLog::Log(info): FlushFileBuffers failed!\n"));
         }
 
     Exit:

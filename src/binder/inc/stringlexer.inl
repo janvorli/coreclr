@@ -36,7 +36,7 @@ void StringLexer::Init(SString &inputString, BOOL fSupportEscaping)
 
 BOOL StringLexer::IsWhitespace(WCHAR wcChar)
 {
-    return ((wcChar == L'\n') || (wcChar == L'\r') || (wcChar == L' ') || (wcChar == L'\t'));
+    return ((wcChar == W('\n')) || (wcChar == W('\r')) || (wcChar == W(' ')) || (wcChar == W('\t')));
 }
 
 BOOL StringLexer::IsEOS(WCHAR wcChar)
@@ -46,46 +46,46 @@ BOOL StringLexer::IsEOS(WCHAR wcChar)
         
 BOOL StringLexer::IsQuoteCharacter(WCHAR wcChar)
 {
-    return ((wcChar == L'\'') || (wcChar == L'"'));
+    return ((wcChar == W('\'')) || (wcChar == W('"')));
 }
 
 WCHAR StringLexer::PopCharacter(BOOL *pfIsEscaped)
 {
     WCHAR wcCurrentChar = m_wcCurrentChar;
-    BINDER_LOG_ENTER(L"StringLexer::PopCharacter");
+    BINDER_LOG_ENTER(W("StringLexer::PopCharacter"));
 
     if (wcCurrentChar != INVALID_CHARACTER)
     {
-        BINDER_LOG(L"HAVE wcCurrentChar");
+        BINDER_LOG(W("HAVE wcCurrentChar"));
         m_wcCurrentChar = INVALID_CHARACTER;
         *pfIsEscaped = m_fCurrentCharIsEscaped;
     }
     else
     {
-        BINDER_LOG(L"GET wcCurrentChar");
+        BINDER_LOG(W("GET wcCurrentChar"));
         wcCurrentChar = GetNextCharacter(pfIsEscaped);
     }
 
 #ifdef BINDER_DEBUG_LOG
     PathString info;
 
-    info.Printf(L"wcCurrentChar=%p", (void *) wcCurrentChar);
+    info.Printf(W("wcCurrentChar=%p"), (void *)(size_t) wcCurrentChar);
     BINDER_LOG((WCHAR *) info.GetUnicode());
 #endif
 
-    BINDER_LOG_LEAVE(L"StringLexer::PopCharacter");
+    BINDER_LOG_LEAVE(W("StringLexer::PopCharacter"));
     return wcCurrentChar;
 }
 
 void StringLexer::PushCharacter(WCHAR wcCurrentChar,
                                 BOOL  fIsEscaped)
 {
-    BINDER_LOG_ENTER(L"StringLexer::PushCharacter");
+    BINDER_LOG_ENTER(W("StringLexer::PushCharacter"));
 
 #ifdef BINDER_DEBUG_LOG
     PathString info;
 
-    info.Printf(L"wcCurrentChar=%p, fIsEscaped=%d", (void *) wcCurrentChar, fIsEscaped);
+    info.Printf(W("wcCurrentChar=%p, fIsEscaped=%d"), (void *)(size_t) wcCurrentChar, fIsEscaped);
     BINDER_LOG((WCHAR *) info.GetUnicode());
 #endif
 
@@ -94,7 +94,7 @@ void StringLexer::PushCharacter(WCHAR wcCurrentChar,
     m_wcCurrentChar = wcCurrentChar;
     m_fCurrentCharIsEscaped = fIsEscaped;
 
-    BINDER_LOG_LEAVE(L"StringLexer::PushCharacter");
+    BINDER_LOG_LEAVE(W("StringLexer::PushCharacter"));
 }
 
 WCHAR StringLexer::GetRawCharacter()
@@ -166,7 +166,7 @@ WCHAR StringLexer::GetNextCharacter(BOOL *pfIsEscaped)
     *pfIsEscaped = FALSE;
 
     WCHAR wcCurrentChar = GetRawCharacter(); // DecodeUTF16Character()
-    if (wcCurrentChar == L'\\')
+    if (wcCurrentChar == W('\\'))
     {
         WCHAR wcTempChar = GetRawCharacter(); // DecodeUTF16Character()
 
@@ -175,23 +175,23 @@ WCHAR StringLexer::GetNextCharacter(BOOL *pfIsEscaped)
             // Handle standard escapes
             switch (wcTempChar)
             {
-            case L'"':
-            case L'\'':
-            case L',':
-            case L'\\':
-            case L'/':
-            case L'=':
+            case W('"'):
+            case W('\''):
+            case W(','):
+            case W('\\'):
+            case W('/'):
+            case W('='):
                 break;
-            case L't':
+            case W('t'):
                 wcTempChar = 9;
                 break;
-            case L'n':
+            case W('n'):
                 wcTempChar = 10;
                 break;
-            case L'r':
+            case W('r'):
                 wcTempChar = 13;
                 break;
-            case L'u':
+            case W('u'):
                 wcTempChar = ParseUnicode();
                 break;
             default:
@@ -206,8 +206,8 @@ WCHAR StringLexer::GetNextCharacter(BOOL *pfIsEscaped)
             // Do not handle escapes except for quotes
             switch (wcTempChar)
             {
-            case L'"':
-            case L'\'':
+            case W('"'):
+            case W('\''):
                 *pfIsEscaped = TRUE;
                 wcCurrentChar = wcTempChar;
                 break;
@@ -231,7 +231,7 @@ WCHAR StringLexer::ParseUnicode()
         WCHAR wcCurrentChar = DecodeUTF16Character();
         nCharacters++;
 
-        if (wcCurrentChar == L';')
+        if (wcCurrentChar == W(';'))
         {
             break;
         }
@@ -242,17 +242,17 @@ WCHAR StringLexer::ParseUnicode()
 
         wcUnicodeChar <<= 4;
 
-        if ((wcCurrentChar >= L'0') && (wcCurrentChar <= L'9'))
+        if ((wcCurrentChar >= W('0')) && (wcCurrentChar <= W('9')))
         {
-            wcUnicodeChar += (wcCurrentChar - L'0');
+            wcUnicodeChar += (wcCurrentChar - W('0'));
         }
-        else if ((wcCurrentChar >= L'a') && (wcCurrentChar <= L'f'))
+        else if ((wcCurrentChar >= W('a')) && (wcCurrentChar <= W('f')))
         {
             wcUnicodeChar += (wcCurrentChar - L'a') + 10;
         }
-        else if ((wcCurrentChar >= L'A') && (wcCurrentChar <= L'F'))
+        else if ((wcCurrentChar >= W('A')) && (wcCurrentChar <= W('F')))
         {
-            wcUnicodeChar += (wcCurrentChar - L'A') + 10;
+            wcUnicodeChar += (wcCurrentChar - W('A')) + 10;
         }
         else
         {

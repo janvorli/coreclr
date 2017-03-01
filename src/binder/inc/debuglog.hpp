@@ -68,23 +68,23 @@ namespace BINDER_SPACE
     public:
         static HRESULT Startup();
     
-        static void Enter(/* in */ WCHAR *pwzScope);
-        static void Leave(/* in */ WCHAR *pwzScope);
-        static void LeaveHR(/* in */ WCHAR   *pwzScope,
+        static void Enter(/* in */ const WCHAR *pwzScope);
+        static void Leave(/* in */ const WCHAR *pwzScope);
+        static void LeaveHR(/* in */ const WCHAR   *pwzScope,
                             /* in */ HRESULT  hrLog);
-        static void LeaveBool(/* in */ WCHAR   *pwzScope,
+        static void LeaveBool(/* in */ const WCHAR   *pwzScope,
                               /* in */ BOOL     fResult);
 
-        static void Log(/* in */ WCHAR *pwzComment);
-        static void Log(/* in */ WCHAR   *pwzComment,
+        static void Log(/* in */ const WCHAR *pwzComment);
+        static void Log(/* in */ const WCHAR   *pwzComment,
                         /* in */ SString &value);
-        static void Log(/* in */ WCHAR   *pwzComment,
+        static void Log(/* in */ const WCHAR   *pwzComment,
                         /* in */ const WCHAR   *value);
-        static void Log(/* in */ WCHAR   *pwzComment,
+        static void Log(/* in */ const WCHAR   *pwzComment,
                         /* in */ HRESULT  hrLog);
-        static void Log(/* in */ WCHAR        *pwzComment,
+        static void Log(/* in */ const WCHAR        *pwzComment,
                         /* in */ AssemblyName *pAssemblyName);
-        static void Log(/* in */ WCHAR        *pwzComment,
+        static void Log(/* in */ const WCHAR        *pwzComment,
                         /* in */ void         *pData);
     protected:
         static void Log(/* in */ SString &info);

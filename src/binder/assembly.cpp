@@ -127,7 +127,7 @@ Exit:
 
     Assembly::~Assembly()
     {
-        BINDER_LOG_ASSEMBLY_NAME(L"destructing assembly", m_pAssemblyName);
+        BINDER_LOG_ASSEMBLY_NAME(W("destructing assembly"), m_pAssemblyName);
 
         if (m_pPEImage != NULL)
         {
@@ -158,7 +158,7 @@ Exit:
                            BOOL                     fIsInGAC)
     {
         HRESULT hr = S_OK;
-        BINDER_LOG_ENTER(L"Assembly::Init");
+        BINDER_LOG_ENTER(W("Assembly::Init"));
 
         ReleaseHolder<AssemblyName> pAssemblyName;
         SAFE_NEW(pAssemblyName, AssemblyName);
@@ -171,8 +171,8 @@ Exit:
             GetPath().Set(assemblyPath);
         }
 
-        BINDER_LOG_ASSEMBLY_NAME(L"AssemblyNameDef", pAssemblyName);
-        BINDER_LOG_STRING(L"System Architecture",
+        BINDER_LOG_ASSEMBLY_NAME(W("AssemblyNameDef"), pAssemblyName);
+        BINDER_LOG_STRING(W("System Architecture"),
                           AssemblyName::ArchitectureToString(GetSystemArchitecture()));
 
         // Safe architecture for validation
@@ -195,7 +195,7 @@ Exit:
         }
 
     Exit:
-        BINDER_LOG_LEAVE_HR(L"Assembly::Init", hr);
+        BINDER_LOG_LEAVE_HR(W("Assembly::Init"), hr);
         return hr;
     }
 
@@ -211,7 +211,7 @@ Exit:
                                              AssemblyName **ppAssemblyName)
     {
         HRESULT hr = S_OK;
-        BINDER_LOG_ENTER(L"Assembly::GetNextAssemblyNameRef");
+        BINDER_LOG_ENTER(W("Assembly::GetNextAssemblyNameRef"));
 
         if (ppAssemblyName == NULL)
         {
@@ -256,7 +256,7 @@ Exit:
         }
 
     Exit:
-        BINDER_LOG_LEAVE_HR(L"Assembly::GetNextAssemblyNameRef", hr);
+        BINDER_LOG_LEAVE_HR(W("Assembly::GetNextAssemblyNameRef"), hr);
         return hr;
     }
 

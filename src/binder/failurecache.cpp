@@ -36,7 +36,7 @@ namespace BINDER_SPACE
                               HRESULT hrBindingResult)
     {
         HRESULT hr = S_OK;
-        BINDER_LOG_ENTER(L"FailureCache::Add");
+        BINDER_LOG_ENTER(W("FailureCache::Add"));
 
         NewHolder<FailureCacheEntry> pFailureCacheEntry;
         SAFE_NEW(pFailureCacheEntry, FailureCacheEntry);
@@ -51,14 +51,14 @@ namespace BINDER_SPACE
         pFailureCacheEntry.SuppressRelease();
 
     Exit:
-        BINDER_LOG_LEAVE_HR(L"FailureCache::Add", hr);
+        BINDER_LOG_LEAVE_HR(W("FailureCache::Add"), hr);
         return hr;
     }
 
     HRESULT FailureCache::Lookup(SString &assemblyNameorPath)
     {
         HRESULT hr = S_OK;
-        BINDER_LOG_ENTER(L"FailureCache::Lookup");
+        BINDER_LOG_ENTER(W("FailureCache::Lookup"));
         FailureCacheEntry *pFailureCachEntry = Hash::Lookup(assemblyNameorPath);
 
         if (pFailureCachEntry != NULL)
@@ -66,13 +66,13 @@ namespace BINDER_SPACE
             hr = pFailureCachEntry->GetBindingResult();
         }
 
-        BINDER_LOG_LEAVE_HR(L"FailureCache::Lookup", hr);
+        BINDER_LOG_LEAVE_HR(W("FailureCache::Lookup"), hr);
         return hr;
     }
 
     void FailureCache::Remove(SString &assemblyName)
     {
-        BINDER_LOG_ENTER(L"FailureCache::Remove");
+        BINDER_LOG_ENTER(W("FailureCache::Remove"));
 
         FailureCacheEntry *pFailureCachEntry = Hash::Lookup(assemblyName);
 
@@ -80,6 +80,6 @@ namespace BINDER_SPACE
         Hash::Remove(assemblyName);
         SAFE_DELETE(pFailureCachEntry);
         
-        BINDER_LOG_LEAVE(L"FailureCache::Remove");
+        BINDER_LOG_LEAVE(W("FailureCache::Remove"));
     }
 };
