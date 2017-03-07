@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <dirent.h>
 
 #include "icushim.h"
 
@@ -33,6 +34,9 @@ static const int MaxSubICUVersion = 5;
 
 // .x.x.x, considering the max number of decimal digits for each component
 static const int MaxICUVersionStringLength = 33;
+
+static const char LibIcuucBaseName[] = "libicuuc.so";
+static const char LibIcui18nBaseName[] = "libicui18n.so";
 
 // Get filename of an ICU library with the requested version in the name
 // There are three possible cases of the version components values:
@@ -61,11 +65,11 @@ bool OpenICULibraries(int majorVer, int minorVer, int subVer)
     char libicuucName[64];
     char libicui18nName[64];
 
-    static_assert(sizeof("libicuuc.so") + MaxICUVersionStringLength <= sizeof(libicuucName), "The libicuucName is too small");
-    GetVersionedLibFileName("libicuuc.so", majorVer, minorVer, subVer, libicuucName);
+    static_assert(sizeof(LibIcuucBaseName) + MaxICUVersionStringLength <= sizeof(libicuucName), "The libicuucName is too small");
+    GetVersionedLibFileName(LibIcuucBaseName, majorVer, minorVer, subVer, libicuucName);
 
-    static_assert(sizeof("libicui18n.so") + MaxICUVersionStringLength <= sizeof(libicui18nName), "The libicui18nName is too small");
-    GetVersionedLibFileName("libicui18n.so", majorVer, minorVer, subVer, libicui18nName);
+    static_assert(sizeof(LibIcui18nBaseName) + MaxICUVersionStringLength <= sizeof(libicui18nName), "The libicui18nName is too small");
+    GetVersionedLibFileName(LibIcui18nBaseName, majorVer, minorVer, subVer, libicui18nName);
 
     libicuuc = dlopen(libicuucName, RTLD_LAZY);
     if (libicuuc != nullptr)
@@ -80,6 +84,74 @@ bool OpenICULibraries(int majorVer, int minorVer, int subVer)
 
     return libicuuc != nullptr;
 }
+
+#if FEATURE_STANDALONE_PACKAGE
+// Select the version of ICU present in the local third party folder.
+// This ensures that we pick the version in the local folder if present instead of
+// a system wide higher version.
+bool FindLibInLocalFolder(int* majorVer, int* minorVer, int* subVer)
+{
+    bool found = false;
+
+    // Find the path of the System.Globalization.Native.so that we are currently executing and
+    // derive the local third party libraries directory path from it.
+    Dl_info dlInfo;
+    if (dladdr((void*)FindLibInLocalFolder, &dlInfo) != 0)
+    {
+        const char* lastSlash = strrchr(dlInfo.dli_fname, '/');
+        if (lastSlash != nullptr)
+        {
+            size_t pathLen = lastSlash - dlInfo.dli_fname + 1;
+            char* thirdPartyLibsdirPath = (char*)malloc(pathLen + sizeof(THIRD_PARTY_LIBS_DIR) + 1);
+
+            if (thirdPartyLibsdirPath != nullptr)
+            {
+                strncpy(thirdPartyLibsdirPath, dlInfo.dli_fname, pathLen);
+                strcpy(thirdPartyLibsdirPath + pathLen, THIRD_PARTY_LIBS_DIR);
+
+                // Search the local third party libraries directory for libicuuc.so.xxx
+                DIR* dir;
+                struct dirent *dirEntry;
+                dir = opendir(thirdPartyLibsdirPath);
+                if (dir != nullptr)
+                {
+                    while ((dirEntry = readdir(dir)) != nullptr)
+                    {
+                        if (strncmp(dirEntry->d_name, LibIcuucBaseName, sizeof(LibIcuucBaseName) - 1) == 0)
+                        {
+                            int first = -1;
+                            int second = -1;
+                            int third = -1;
+
+                            int matches = sscanf(dirEntry->d_name + sizeof(LibIcuucBaseName) - 1,
+                                                 ".%d.%d.%d",
+                                                 &first, &second, &third);
+                            if (matches > 0)
+                            {
+                                // We have found libicuuc.so.xxx, try to open all necessary ICU libraries
+                                // with that version.
+                                if (OpenICULibraries(first, second, third))
+                                {
+                                    *majorVer = first;
+                                    *minorVer = second;
+                                    *subVer = third;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                closedir(dir);
+                free(thirdPartyLibsdirPath);
+            }
+        }
+    }
+
+    return found;
+}
+#endif // FEATURE_STANDALONE_PACKAGE
 
 // Select libraries using the version override specified by the CLR_ICU_VERSION_OVERRIDE
 // environment variable.
@@ -179,6 +251,9 @@ void InitializeICUShim()
     int subVer = -1;
 
     if (!FindLibUsingOverride(&majorVer, &minorVer, &subVer) &&
+#if FEATURE_STANDALONE_PACKAGE
+        !FindLibInLocalFolder(&majorVer, &minorVer, &subVer) &&
+#endif // FEATURE_STANDALONE_PACKAGE
         !FindLibWithMajorMinorVersion(&majorVer, &minorVer) &&
         !FindLibWithMajorMinorSubVersion(&majorVer, &minorVer, &subVer) &&
         // This is a fallback for the rare case when there are only lib files with major version

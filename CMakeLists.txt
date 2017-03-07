@@ -28,6 +28,15 @@ if(CORECLR_SET_RPATH)
     set(MACOSX_RPATH ON)
 endif(CORECLR_SET_RPATH)
 
+# When building standalone package, all binaries will have RPATH set
+# to the libs subfolder of their location where local copies of third
+# party dependencies can be placed.
+if(FEATURE_STANDALONE_PACKAGE)
+    set(THIRD_PARTY_LIBS_DIR "3rdpartylibs")
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+    set(CMAKE_INSTALL_RPATH "\$ORIGIN/${THIRD_PARTY_LIBS_DIR}")
+endif(FEATURE_STANDALONE_PACKAGE)
+
 OPTION(CMAKE_ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
 
 # Ensure that python is present

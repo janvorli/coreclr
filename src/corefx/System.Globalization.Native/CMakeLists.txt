@@ -40,6 +40,11 @@ include(configure.cmake)
 
 add_compile_options(-fPIC)
 
+if(FEATURE_STANDALONE_PACKAGE)
+    add_definitions(-DFEATURE_STANDALONE_PACKAGE=1)
+    add_definitions(-DTHIRD_PARTY_LIBS_DIR=${THIRD_PARTY_LIBS_DIR})
+endif()
+
 set(NATIVEGLOBALIZATION_SOURCES
     calendarData.cpp
     casing.cpp
