@@ -542,6 +542,10 @@ include(pgosupport.cmake)
 #     - project which require platform header not clr's
 #     - do not depend on clr's compile definitions
 #-----------------------------------------
+if(CLR_BUILD_ONLY_PAL)
+    add_subdirectory(src/pal)
+else(CLR_BUILD_ONLY_PAL)
+
 if(CLR_CMAKE_PLATFORM_UNIX AND NOT DEFINED CLR_CROSS_COMPONENTS_BUILD)
     add_subdirectory(src/corefx)
 endif()
@@ -620,3 +624,5 @@ if(CLR_CMAKE_BUILD_TESTS)
 endif(CLR_CMAKE_BUILD_TESTS)
 
 include(definitionsconsistencycheck.cmake)
+
+endif(CLR_BUILD_ONLY_PAL)
