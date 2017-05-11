@@ -152,6 +152,7 @@ Note:
 Others are set to zero.
 
 --*/
+PUB
 VOID
 PALAPI
 GetSystemInfo(
@@ -218,6 +219,7 @@ Return Values
 This function returns a BOOL to indicate its success status.
 
 --*/
+PUB
 BOOL
 PALAPI
 GlobalMemoryStatusEx(

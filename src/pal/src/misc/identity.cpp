@@ -299,7 +299,7 @@ Function:
 Uses gethostname to get the computer name. See MSDN for functional spec.
 
 --*/
-PALIMPORT
+PUB
 BOOL
 PALAPI
 GetComputerNameW(

@@ -118,6 +118,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 HMODULE
 PALAPI
 LoadLibraryA(
@@ -262,6 +263,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 FARPROC
 PALAPI
 GetProcAddress(
@@ -384,6 +386,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 FreeLibrary(
@@ -669,6 +672,7 @@ Function:
   as part of calling DllMain in the calling module.
 
 --*/
+PUB
 HINSTANCE
 PALAPI
 PAL_RegisterModule(
@@ -706,6 +710,7 @@ Function:
 
   Used to cleanup the module HINSTANCE from PAL_RegisterModule.
 --*/
+PUB
 VOID
 PALAPI
 PAL_UnregisterModule(

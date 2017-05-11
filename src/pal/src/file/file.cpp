@@ -906,6 +906,7 @@ Note:
 
 See MSDN doc.
 --*/
+PUB
 HANDLE
 PALAPI
 CreateFileW(
@@ -999,6 +1000,7 @@ Notes:
 This is because we know that CreateFile, ReadFile, and WriteFile will do so,
 and will have a much better idea of the specific error.
 --*/
+PUB
 BOOL
 PALAPI
 CopyFileW(
@@ -1155,6 +1157,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 DeleteFileW(
@@ -1438,6 +1441,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 MoveFileExW(
@@ -1687,6 +1691,7 @@ Function:
 
 See MSDN doc, and notes for GetFileAttributesW.
 --*/
+PUB
 BOOL
 PALAPI
 GetFileAttributesExW(
@@ -1808,6 +1813,7 @@ Notes:
   Used for setting read-only attribute on file only.
 
 --*/
+PUB
 BOOL
 PALAPI
 SetFileAttributesW(
@@ -2047,6 +2053,7 @@ Note:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 WriteFile(
@@ -2271,6 +2278,7 @@ Note:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 ReadFile(
@@ -2317,6 +2325,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 HANDLE
 PALAPI
 GetStdHandle(
@@ -2497,6 +2506,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 SetEndOfFile(
@@ -2737,6 +2747,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 DWORD
 PALAPI
 SetFilePointer(
@@ -2936,6 +2947,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 DWORD
 PALAPI
 GetFileSize(
@@ -3124,6 +3136,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 FlushFileBuffers(
@@ -3255,6 +3268,7 @@ Function:
 See MSDN doc.
 
 --*/
+PUB
 DWORD
 PALAPI
 GetFileType(
@@ -3502,6 +3516,7 @@ Function:
 
 uUnique is always 0.
 --*/
+PUB
 UINT
 PALAPI
 GetTempFileNameW(
@@ -4371,7 +4386,7 @@ Function:
 
 See MSDN doc.
 --*/
-PALIMPORT
+PUB
 BOOL
 PALAPI
 LockFile(HANDLE hFile,
@@ -4497,6 +4512,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 PALIMPORT
 BOOL
 PALAPI

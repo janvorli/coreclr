@@ -191,6 +191,7 @@ GetTickCount(
     return retval;
 }
 
+PUB
 BOOL
 PALAPI
 QueryPerformanceCounter(
@@ -255,6 +256,7 @@ QueryPerformanceCounter(
     return retval;
 }
 
+PUB
 BOOL
 PALAPI
 QueryPerformanceFrequency(

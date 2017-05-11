@@ -1318,6 +1318,7 @@ Note:
 
 See MSDN doc.
 --*/
+PUB
 LPVOID
 PALAPI
 VirtualAlloc(
@@ -1437,6 +1438,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 VirtualFree(
@@ -1885,6 +1887,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 SIZE_T
 PALAPI
 VirtualQuery(

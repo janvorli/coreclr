@@ -161,6 +161,7 @@ As noted in the file header, there is no analog to "creation time" on Unix
 systems, so the lpCreationTime argument to this function will always be
 ignored, and the inode change time will be set to the current time.
 --*/
+PUB
 BOOL
 PALAPI
 SetFileTime(

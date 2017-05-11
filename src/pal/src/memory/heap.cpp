@@ -67,6 +67,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 VOID
 PALAPI
 RtlZeroMemory(

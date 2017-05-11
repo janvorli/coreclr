@@ -716,6 +716,7 @@ See MSDN doc.
 --*/
 // no PAL_NORETURN, as callers must assume this can return for continuable exceptions.
 __attribute__((noinline))
+PUB
 VOID
 PALAPI
 RaiseException(IN DWORD dwExceptionCode,
