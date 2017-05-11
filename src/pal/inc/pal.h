@@ -5439,7 +5439,7 @@ PALIMPORT char * __cdecl _strdup(const char *);
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 
-#endif // !PAL_STDCPP_COMPAT
+//#endif // !PAL_STDCPP_COMPAT
 
 PALIMPORT PAL_NORETURN void __cdecl exit(int);
 int __cdecl atexit(void (__cdecl *function)(void));
@@ -5450,7 +5450,7 @@ int (__cdecl *)(const void *, const void *));
 
 PALIMPORT char * __cdecl _fullpath(char *, const char *, size_t);
 
-#ifndef PAL_STDCPP_COMPAT
+//#ifndef PAL_STDCPP_COMPAT
 PALIMPORT time_t __cdecl time(time_t *);
 
 struct tm {
@@ -5544,7 +5544,7 @@ PALIMPORT int __cdecl rand(void);
 PALIMPORT void __cdecl srand(unsigned int);
 
 PALIMPORT int __cdecl printf(const char *, ...);
-PALIMPORT int __cdecl vprintf(const char *, va_list);
+int __cdecl vprintf(const char *, va_list);
 
 #ifdef _MSC_VER
 #define PAL_get_caller _MSC_VER
