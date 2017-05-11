@@ -100,8 +100,8 @@ extern "C" {
 
 #else
 
-#define PALIMPORT
-#define PAL_NORETURN    __attribute__((noreturn))
+#define PALIMPORT    __attribute__((visibility("default")))
+#define PAL_NORETURN __attribute__((noreturn))
 
 #endif
 
