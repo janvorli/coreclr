@@ -208,6 +208,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 DWORD
 PALAPI
 GetCurrentProcessId(
@@ -248,6 +249,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 HANDLE
 PALAPI
 GetCurrentProcess(

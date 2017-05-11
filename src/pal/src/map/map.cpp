@@ -950,6 +950,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 LPVOID
 PALAPI
 MapViewOfFile(
@@ -1048,6 +1049,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 BOOL
 PALAPI
 UnmapViewOfFile(

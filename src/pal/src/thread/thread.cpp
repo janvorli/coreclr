@@ -375,6 +375,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 DWORD
 PALAPI
 GetCurrentThreadId(

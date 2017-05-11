@@ -289,6 +289,7 @@ GetConsoleOutputCP
 
 See MSDN doc.
 --*/
+PUB
 UINT
 PALAPI
 GetConsoleOutputCP(
@@ -523,6 +524,7 @@ GetACP
 
 See MSDN doc.
 --*/
+PUB
 UINT
 PALAPI
 GetACP(VOID)
@@ -607,6 +609,7 @@ MultiByteToWideChar
 See MSDN doc.
 
 --*/
+PUB
 int
 PALAPI
 MultiByteToWideChar(
@@ -734,6 +737,7 @@ WideCharToMultiByte
 See MSDN doc.
 
 --*/
+PUB
 int
 PALAPI
 WideCharToMultiByte(

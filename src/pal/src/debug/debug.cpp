@@ -173,6 +173,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 VOID
 PALAPI
 OutputDebugStringW(
@@ -391,6 +392,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 VOID
 PALAPI
 DebugBreak(

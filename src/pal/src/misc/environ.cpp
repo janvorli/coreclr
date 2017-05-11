@@ -158,6 +158,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 DWORD
 PALAPI
 GetEnvironmentVariableW(
@@ -286,6 +287,7 @@ This function has no effect on the system environment variables or the
 environment variables of other processes.
 
 --*/
+PUB
 BOOL
 PALAPI
 SetEnvironmentVariableW(
@@ -391,6 +393,7 @@ the block is no longer needed, it should be freed by calling
 FreeEnvironmentStrings.
 
 --*/
+PUB
 LPWSTR
 PALAPI
 GetEnvironmentStringsW(
@@ -526,6 +529,7 @@ of environment strings. When the block is no longer needed, it should
 be freed by calling FreeEnvironmentStrings.
 
 --*/
+PUB
 BOOL
 PALAPI
 FreeEnvironmentStringsW(

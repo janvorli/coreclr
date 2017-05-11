@@ -166,6 +166,7 @@ Function:
 
 See MSDN doc.
 --*/
+PUB
 DWORD
 PALAPI
 GetFullPathNameW(
@@ -281,6 +282,7 @@ Note:
   this function simply copies the given path into the new buffer.
 
 --*/
+PUB
 DWORD
 PALAPI
 GetLongPathNameW(
@@ -527,6 +529,7 @@ Function:
 See MSDN.
 See also the comment for GetTempPathA.
 --*/
+PUB
 DWORD
 PALAPI
 GetTempPathW(

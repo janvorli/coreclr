@@ -167,6 +167,7 @@ Return:
   -1 if it failed
 
 --*/
+PUB
 int
 PALAPI
 PAL_InitializeDLL()
@@ -885,6 +886,7 @@ This function is the called when a thread has finished using the PAL
 library. It shuts down PAL and exits the current process with
 the specified exit code.
 --*/
+PUB
 void
 PALAPI
 PAL_TerminateEx(
