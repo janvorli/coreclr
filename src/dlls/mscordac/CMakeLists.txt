@@ -38,7 +38,7 @@ endif(WIN32)
 if(CLR_CMAKE_PLATFORM_LINUX OR CLR_CMAKE_PLATFORM_FREEBSD OR CLR_CMAKE_PLATFORM_NETBSD)
     # This option is necessary to ensure that the overloaded delete operator defined inside
     # of the utilcode will be used instead of the standard library delete operator.
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker -Bsymbolic -Xlinker -Bsymbolic-functions")    
+    #set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Xlinker -Bsymbolic -Xlinker -Bsymbolic-functions")    
 
     # The following linked options can be inserted into the linker libraries list to 
     # ensure proper resolving of circular references between a subset of the libraries.
@@ -131,9 +131,9 @@ if(WIN32)
 else(WIN32)
     list(APPEND COREDAC_LIBRARIES
         mscorrc_debug
-        ${START_WHOLE_ARCHIVE} # force all PAL objects to be included so all exports are available  
+        #${START_WHOLE_ARCHIVE} # force all PAL objects to be included so all exports are available  
         coreclrpal
-        ${END_WHOLE_ARCHIVE}
+        #${END_WHOLE_ARCHIVE}
         palrt
     )
 endif(WIN32)

@@ -130,7 +130,7 @@ void jitShutdown()
 
 #ifndef FEATURE_MERGE_JIT_AND_ENGINE
 
-extern "C" BOOL WINAPI DllMain(HANDLE hInstance, DWORD dwReason, LPVOID pvReserved)
+extern "C" PUB BOOL WINAPI DllMain(HANDLE hInstance, DWORD dwReason, LPVOID pvReserved)
 {
     if (dwReason == DLL_PROCESS_ATTACH)
     {
