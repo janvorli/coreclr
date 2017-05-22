@@ -188,15 +188,8 @@ if(WIN32)
 
   set(SHARED_LIB_SOURCES ${SOURCES} ${JIT_EXPORTS_FILE})
 else()
-  set(JIT_EXPORTS_IN_FILE ${CMAKE_CURRENT_BINARY_DIR}/clrjit.exports.in)
-  file(READ "${CMAKE_CURRENT_LIST_DIR}/ClrJit.exports" jit_exports)
-  file(READ "${CMAKE_CURRENT_LIST_DIR}/ClrJit.PAL.exports" pal_exports)
-  file(WRITE ${JIT_EXPORTS_IN_FILE} ${jit_exports})
-  file(APPEND ${JIT_EXPORTS_IN_FILE} "\n")
-  file(APPEND ${JIT_EXPORTS_IN_FILE} ${pal_exports})
-
   set(JIT_EXPORTS_FILE ${CMAKE_CURRENT_BINARY_DIR}/clrjit.exports)
-  generate_exports_file(${JIT_EXPORTS_IN_FILE} ${JIT_EXPORTS_FILE})
+  generate_exports_file("${CMAKE_CURRENT_SOURCE_DIR}/ClrJit.exports" "${CMAKE_CURRENT_SOURCE_DIR}/ClrJit.PAL.exports" ${JIT_EXPORTS_FILE})
 
   if(CMAKE_SYSTEM_NAME STREQUAL Linux OR CMAKE_SYSTEM_NAME STREQUAL FreeBSD OR CMAKE_SYSTEM_NAME STREQUAL NetBSD)
     # This is required to force using our own PAL, not one that we are loaded with.

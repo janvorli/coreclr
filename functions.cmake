@@ -86,7 +86,13 @@ function(preprocess_def_file inputFilename outputFilename)
                               PROPERTIES GENERATED TRUE)
 endfunction()
 
-function(generate_exports_file inputFilename outputFilename)
+# Generate Unix exports file.
+# The function accepts multiple input files, the output file is the last argument
+function(generate_exports_file)
+  set(INPUT_FILES ${ARGV})
+  math(EXPR LAST_ARG_INDEX "${ARGC} - 1")
+  list(REMOVE_AT INPUT_FILES ${LAST_ARG_INDEX})
+  set(OUTPUT_FILENAME ${ARGV${LAST_ARG_INDEX}})
 
   if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
     set(AWK_SCRIPT generateexportedsymbols.awk)
@@ -95,12 +101,12 @@ function(generate_exports_file inputFilename outputFilename)
   endif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
 
   add_custom_command(
-    OUTPUT ${outputFilename}
-    COMMAND ${AWK} -f ${CMAKE_SOURCE_DIR}/${AWK_SCRIPT} ${inputFilename} >${outputFilename}
-    DEPENDS ${inputFilename} ${CMAKE_SOURCE_DIR}/${AWK_SCRIPT}
-    COMMENT "Generating exports file ${outputFilename}"
+    OUTPUT ${OUTPUT_FILENAME}
+    COMMAND ${AWK} -f ${CMAKE_SOURCE_DIR}/${AWK_SCRIPT} ${INPUT_FILES} >${OUTPUT_FILENAME}
+    DEPENDS ${INPUT_FILES} ${CMAKE_SOURCE_DIR}/${AWK_SCRIPT}
+    COMMENT "Generating exports file ${OUTPUT_FILENAME}"
   )
-  set_source_files_properties(${outputFilename}
+  set_source_files_properties(${OUTPUT_FILENAME}
                               PROPERTIES GENERATED TRUE)
 endfunction()
 
