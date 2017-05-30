@@ -154,6 +154,8 @@ static void __stdcall xtox
    and return pointer to buffer. */
 
 #ifdef _SECURE_ITOA
+//__attribute__((visibility("default")))
+PUB
 errno_t __cdecl _itox_s (
         int val,
         TCHAR *buf,
@@ -358,7 +360,8 @@ static void __fastcall x64tox
 
 /* Actual functions just call conversion helper with neg flag set correctly,
    and return pointer to buffer. */
-
+//__attribute__((visibility("default")))
+PUB
 errno_t __cdecl _i64tox_s (
         long long val,
         TCHAR *buf,
