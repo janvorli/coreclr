@@ -411,7 +411,27 @@ extern "C" void signal_handler_worker(int code, siginfo_t *siginfo, void *contex
     // TODO: First variable parameter says whether a read (0) or write (non-0) caused the
     // fault. We must disassemble the instruction at record.ExceptionAddress
     // to correctly fill in this value.
+    
+    // Unmask the activation signal now that we are running on the original stack of the thread
+    sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, INJECT_ACTIVATION_SIGNAL);
+
+    int sigmaskRet = pthread_sigmask(SIG_UNBLOCK, &signal_set, NULL);
+    if (sigmaskRet != 0)
+    {
+        ASSERT("pthread_sigmask failed; error number is %d\n", sigmaskRet);
+    }    
+
     returnPoint->returnFromHandler = common_signal_handler(code, siginfo, context, 2, (size_t)0, (size_t)siginfo->si_addr);
+
+    // We are going to return to the alternate stack, so block the activation signal again
+    sigmaskRet = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
+    if (sigmaskRet != 0)
+    {
+        ASSERT("pthread_sigmask failed; error number is %d\n", sigmaskRet);
+    }
+
     RtlRestoreContext(&returnPoint->context, NULL);
 }
 
@@ -444,6 +464,22 @@ static void sigsegv_handler(int code, siginfo_t *siginfo, void *context)
 
         // Now that we know the SIGSEGV didn't happen due to a stack overflow, execute the common
         // hardware signal handler on the original stack.
+
+        ///////////////////////////////////////////////////////////
+        // This is just experimental. It makes the issue go away, but leaves a small window in which the issue can still hit in
+        ///////////////////////////////////////////////////////////
+
+        sigset_t signal_set;
+        sigemptyset(&signal_set);
+        sigaddset(&signal_set, INJECT_ACTIVATION_SIGNAL);
+    
+        int sigmaskRet = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
+        if (sigmaskRet != 0)
+        {
+            ASSERT("pthread_sigmask failed; error number is %d\n", sigmaskRet);
+        }
+
+        ///////////////////////////////////////////////////////////
 
         // Establish a return point in case the common_signal_handler returns
 
@@ -803,6 +839,7 @@ static bool common_signal_handler(int code, siginfo_t *siginfo, void *sigcontext
     /* Unmask signal so we can receive it again */
     sigemptyset(&signal_set);
     sigaddset(&signal_set, code);
+
     int sigmaskRet = pthread_sigmask(SIG_UNBLOCK, &signal_set, NULL);
     if (sigmaskRet != 0)
     {
@@ -855,6 +892,13 @@ void handle_signal(int signal_id, SIGFUNC sigfunc, struct sigaction *previousAct
     newAction.sa_handler = SIG_DFL;
 #endif  /* HAVE_SIGINFO_T */
     sigemptyset(&newAction.sa_mask);
+    if ((additionalFlags & SA_ONSTACK) != 0)
+    {
+        // Handler that runs on a separate stack should not be interrupted by the activation signal
+        // until it switches back to the regular stack, since that signal's handler would run on
+        // the limited separate stack and cause a stack overflow soon.
+        sigaddset(&newAction.sa_mask, INJECT_ACTIVATION_SIGNAL);
+    }
 
     if (-1 == sigaction(signal_id, &newAction, previousAction))
     {
