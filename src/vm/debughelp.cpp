@@ -1157,13 +1157,13 @@ void PrintDomainName(size_t ob)
     }
 }
 
-#if defined(_TARGET_X86_)
+#if !defined(_TARGET_X86_)
 
 #include "gcdump.h"
 
-#include "../gcdump/i386/gcdumpx86.cpp"
+#include "../gcdump/gcdumpnonx86.cpp"
 
-#include "../gcdump/gcdump.cpp"
+//#include "../gcdump/gcdump.cpp"
 
 /*********************************************************************/
 void printfToDbgOut(const char* fmt, ...)
@@ -1178,13 +1178,11 @@ void printfToDbgOut(const char* fmt, ...)
     va_list args;
     va_start(args, fmt);
 
-    char buffer[4096];
-    _vsnprintf_s(buffer, COUNTOF(buffer), _TRUNCATE, fmt, args);
+    vprintf(fmt, args);
 
     va_end(args);
-    OutputDebugStringA( buffer );
 }
-
+/*
 void DumpGCInfo(MethodDesc* method)
 {
     CONTRACTL
@@ -1214,10 +1212,10 @@ void DumpGCInfo(MethodDesc* method)
 
     gcDump.gcPrintf = printfToDbgOut;
 
-    InfoHdr header;
+    //InfoHdr header;
 
-    printfToDbgOut ("Method info block:\n");
-    gcInfo += gcDump.DumpInfoHdr(gcInfo, &header, &methodSize, 0);
+    //printfToDbgOut ("Method info block:\n");
+    //gcInfo += gcDump.DumpInfoHdr(gcInfo, &header, &methodSize, 0);
 
     printfToDbgOut ("\n");
     printfToDbgOut ("Pointer table:\n");
@@ -1236,13 +1234,60 @@ void DumpGCInfoMD(size_t method)
 
     DumpGCInfo((MethodDesc*) method);
 }
+*/
+
+static uint8_t gcInfoToDump[] = {
+/*0x04, 0x7e, 0x00, 0x00, 0x00,*/ 0x81, 0x01, 0xba,
+0x02, 0x00, 0x60, 0xa3, 0x23, 0xe2, 0xa3, 0x59,
+0x0d, 0xd0, 0x74, 0x01, 0x12, 0x1c, 0x28, 0x4b,
+0x23, 0x00, 0x36, 0x9c, 0x71, 0x2a, 0x39, 0x0a,
+0x83, 0x4c, 0xb3, 0x53, 0x9e, 0x3c, 0x17, 0xab,
+0xa5, 0xa8, 0xb3, 0xd5, 0xcb, 0x24, 0x94, 0x3d,
+0x7b, 0xf3, 0x20, 0x3a, 0xd4, 0xfb, 0x0e, 0x0e,
+0xa5, 0x57, 0x6f, 0xa9, 0x2f, 0x48, 0x76, 0xfc,
+0xe3, 0xb5, 0x4c, 0x7b, 0xbc, 0x6a, 0x0a, 0xbe,
+0xe9, 0xbb, 0xcb, 0xab, 0x66, 0xca, 0x7c, 0xa2,
+0x65, 0x5f, 0x54, 0x4c, 0x23, 0xe6, 0x10, 0xcb,
+0xb6, 0xe7, 0x7d, 0xb1, 0x33, 0x8c, 0x19, 0xa7,
+0xd6, 0xde, 0xa2, 0xf2, 0x39, 0xa9, 0x60, 0xc4,
+0x24, 0xbe, 0x12, 0x5f, 0x8e, 0xd8, 0x2f, 0x19,
+0x67, 0x86, 0xc0, 0x4e, 0xdf, 0x2e, 0xdc, 0x67,
+0x08, 0x6c, 0x8a, 0x42, 0x45, 0xa9, 0x22, 0x02,
+0xb9, 0x04, 0x15, 0x0e
+};
+
+void DumpGCInfoTest()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    GCInfoToken gcInfoToken;
+    gcInfoToken.Info = gcInfoToDump;
+    gcInfoToken.Version = 2;
+
+    unsigned methodSize = 628;
+
+    GCDump gcDump(gcInfoToken.Version);
+    PTR_CBYTE gcInfo = PTR_CBYTE(gcInfoToken.Info);
+
+    gcDump.gcPrintf = printfToDbgOut;
+
+    printfToDbgOut ("Pointer table:\n");
+
+    gcInfo += gcDump.DumpGCTable(gcInfo, methodSize, 0);
+}
+
 #endif
 
 
 #ifdef LOGGING
 void LogStackTrace()
 {
-    WRAPPER_NO_CONTRACT;
+    //WRAPPER_NO_CONTRACT;
 
     PrintCallbackData cbd = {0, 0, 1};
     GetThread()->StackWalkFrames(PrintStackTraceCallback, &cbd,ALLOW_ASYNC_STACK_WALK, 0);

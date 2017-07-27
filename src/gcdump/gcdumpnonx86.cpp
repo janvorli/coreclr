@@ -7,13 +7,20 @@
 
 #include "gcdump.h"
 
+#ifndef LIMITED_METHOD_CONTRACT
 #define LIMITED_METHOD_CONTRACT ((void)0)
+#endif
+
+#ifndef WRAPPER_NO_CONTRACT
 #define WRAPPER_NO_CONTRACT ((void)0)
+#endif
 
 #define GCINFODECODER_NO_EE
 #include "gcinfodecoder.h"
-#include "gcinfodumper.h"
+#undef LIMITED_METHOD_CONTRACT
+#undef WRAPPER_NO_CONTRACT
 
+#include "gcinfodumper.h"
 
 PCSTR GetRegName (UINT32 regnum)
 {
@@ -524,5 +531,5 @@ void    GCDump::DumpPtrsInFrame(PTR_CBYTE   gcInfoBlock,
 #define GET_CALLER_SP(pREGDISPLAY) ((size_t)GetSP(pREGDISPLAY->pCallerContext))
 #define VALIDATE_OBJECTREF(objref, fDeep) ((void)0)
 #define VALIDATE_ROOT(isInterior, hCallBack, pObjRef) ((void)0)
-#include "../vm/gcinfodecoder.cpp"
+//#include "../vm/gcinfodecoder.cpp"
 #include "../gcinfo/gcinfodumper.cpp"

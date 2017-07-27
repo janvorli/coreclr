@@ -368,6 +368,8 @@ int coreclr_create_delegate(
     return hr;
 }
 
+extern void DumpGCInfoTest();
+
 //
 // Execute a managed assembly with given arguments
 //
@@ -395,6 +397,9 @@ int coreclr_execute_assembly(
     {
         return HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER);
     }
+
+    DumpGCInfoTest();
+
     *exitCode = -1;
 
     ICLRRuntimeHost4* host = reinterpret_cast<ICLRRuntimeHost4*>(hostHandle);

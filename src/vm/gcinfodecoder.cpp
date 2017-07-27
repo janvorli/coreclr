@@ -34,6 +34,7 @@
 #endif // DACCESS_COMPILE || CROSSGEN_COMPILE
 #endif // !VALIDATE_OBJECTREF
 
+#define VALIDATE_ROOT(isInterior, hCallBack, pObjRef) ((void)0)
 #ifndef VALIDATE_ROOT
 #include "gcenv.h"
 #define VALIDATE_ROOT(isInterior, hCallBack, pObjRef)                                           \
@@ -52,6 +53,7 @@
     } while (0)
 #endif // !VALIDATE_ROOT
 
+#define LOG_PIPTR(pObjRef, gcFlags, hCallBack) ((void)0)
 #ifndef LOG_PIPTR
 #define LOG_PIPTR(pObjRef, gcFlags, hCallBack)                                                                                                  \
     {                                                                                                                                           \
