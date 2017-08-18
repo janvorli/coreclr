@@ -3383,6 +3383,10 @@ HCIMPL2(LPVOID, ArrayStoreCheck, Object** pElement, PtrArray** pArray)
 }
 HCIMPLEND
 
+//extern "C" void (*JIT_WriteBarrier)(Object **dst, Object *ref);
+//extern "C" void (*JIT_CheckedWriteBarrier)(Object **dst, Object *ref);
+
+
 /****************************************************************************/
 /* assigns 'val to 'array[idx], after doing all the proper checks */
 

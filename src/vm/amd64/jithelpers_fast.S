@@ -25,7 +25,7 @@ LEAF_END JIT_PatchedCodeStart, _TEXT
 // it needs to have it's card updated
 //
 // void JIT_CheckedWriteBarrier(Object** dst, Object* src)
-LEAF_ENTRY JIT_CheckedWriteBarrier, _TEXT
+LEAF_ENTRY JIT_CheckedWriteBarrier_Template, _TEXT
 
         // When WRITE_BARRIER_CHECK is defined _NotInHeap will write the reference
         // but if it isn't then it will just return.
@@ -47,7 +47,7 @@ LEAF_ENTRY JIT_CheckedWriteBarrier, _TEXT
         // See comment above about possible AV
         mov     [rdi], rsi
         ret
-LEAF_END_MARKED JIT_CheckedWriteBarrier, _TEXT
+LEAF_END_MARKED JIT_CheckedWriteBarrier_Template, _TEXT
 
 
 // This is used by the mechanism to hold either the JIT_WriteBarrier_PreGrow 
@@ -56,7 +56,7 @@ LEAF_END_MARKED JIT_CheckedWriteBarrier, _TEXT
 // larger of the two functions (JIT_WriteBarrier_PostGrow) to ensure we have created
 // enough space to copy that code in.
 .balign 16
-LEAF_ENTRY JIT_WriteBarrier, _TEXT
+LEAF_ENTRY JIT_WriteBarrier_Template, _TEXT
 #ifdef _DEBUG
         // In debug builds, this just contains jump to the debug version of the write barrier by default
         jmp C_FUNC(JIT_WriteBarrier_Debug)
@@ -214,7 +214,7 @@ LEAF_ENTRY JIT_WriteBarrier, _TEXT
     // make sure this guy is bigger than any of the other guys
     .balign 16
         nop
-LEAF_END_MARKED JIT_WriteBarrier, _TEXT
+LEAF_END_MARKED JIT_WriteBarrier_Template, _TEXT
 
 // Mark start of the code region that we patch at runtime
 LEAF_ENTRY JIT_PatchedCodeLast, _TEXT
@@ -438,7 +438,8 @@ LEAF_ENTRY JIT_Stelem_Ref, _TEXT
         mov     rsi, rdx
 
         // JIT_WriteBarrier(Object** dst, Object* src)
-        jmp     C_FUNC(JIT_WriteBarrier)
+        PREPARE_EXTERNAL_VAR JIT_WriteBarrier, r11
+        jmp     [r11]
 
     LOCAL_LABEL(AssigningNull):
         // write barrier is not needed for assignment of NULL references
@@ -492,7 +493,8 @@ LEAF_ENTRY JIT_Stelem_Ref__ObjIsInstanceOfNoGC_Helper, _TEXT
         mov     rsi, rdx
 
         // JIT_WriteBarrier(Object** dst, Object* src)
-        jmp     C_FUNC(JIT_WriteBarrier)
+        PREPARE_EXTERNAL_VAR JIT_WriteBarrier, r11
+        jmp     [r11]
 
     LOCAL_LABEL(NeedCheck):
         jmp     C_FUNC(JIT_Stelem_Ref__ArrayStoreCheck_Helper)
@@ -524,5 +526,6 @@ LEAF_ENTRY JIT_Stelem_Ref__ArrayStoreCheck_Helper, _TEXT
         RESET_FRAME_WITH_RBP
         
         // JIT_WriteBarrier(Object** dst, Object* src)
-        jmp     C_FUNC(JIT_WriteBarrier)
+        PREPARE_EXTERNAL_VAR JIT_WriteBarrier, r11
+        jmp     [r11]
 LEAF_END JIT_Stelem_Ref__ArrayStoreCheck_Helper, _TEXT

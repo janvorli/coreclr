@@ -249,10 +249,13 @@ FCDECL1(void*, JIT_SafeReturnableByref, void* byref);
 extern "C" FCDECL3(VOID, JIT_CheckedWriteBarrier, Object **dst, Object *ref, CheckedWriteBarrierKinds kind);
 #else
 // Regular checked write barrier.
-extern "C" FCDECL2(VOID, JIT_CheckedWriteBarrier, Object **dst, Object *ref);
+extern "C" FCDECL2(VOID, JIT_CheckedWriteBarrier_Template, Object **dst, Object *ref);
+extern void (*JIT_CheckedWriteBarrier)(Object **dst, Object *ref);
 #endif
 
-extern "C" FCDECL2(VOID, JIT_WriteBarrier, Object **dst, Object *ref);
+extern void (*JIT_WriteBarrier)(Object **dst, Object *ref);
+
+extern "C" FCDECL2(VOID, JIT_WriteBarrier_Template, Object **dst, Object *ref);
 
 extern "C" FCDECL2(VOID, JIT_WriteBarrierEnsureNonHeapTarget, Object **dst, Object *ref);
 

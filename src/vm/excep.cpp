@@ -7050,8 +7050,10 @@ IsDebuggerFault(EXCEPTION_RECORD *pExceptionRecord,
 EXTERN_C void JIT_MemSet_End();
 EXTERN_C void JIT_MemCpy_End();
 
-EXTERN_C void JIT_WriteBarrier_End();
-EXTERN_C void JIT_CheckedWriteBarrier_End();
+//EXTERN_C void (*JIT_WriteBarrier)(Object **dst, Object *ref);
+extern void (*JIT_WriteBarrier_End)();
+//EXTERN_C void (*JIT_CheckedWriteBarrier)(Object **dst, Object *ref);
+extern void (*JIT_CheckedWriteBarrier_End)();
 #endif // _TARGET_X86_
 
 #if defined(_TARGET_AMD64_) && defined(_DEBUG)

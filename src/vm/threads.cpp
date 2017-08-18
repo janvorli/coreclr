@@ -1351,6 +1351,16 @@ extern "C" void * ClrFlsGetBlock();
 extern "C" void STDCALL JIT_PatchedCodeStart();
 extern "C" void STDCALL JIT_PatchedCodeLast();
 
+extern "C" void JIT_WriteBarrier_Template(Object **dst, Object *ref);
+extern "C" void JIT_WriteBarrier_Template_End();
+extern "C" void JIT_CheckedWriteBarrier_Template(Object **dst, Object *ref);
+extern "C" void JIT_CheckedWriteBarrier_Template_End();
+
+void (*JIT_WriteBarrier)(Object **dst, Object *ref);
+void (*JIT_WriteBarrier_End)();
+void (*JIT_CheckedWriteBarrier)(Object **dst, Object *ref);
+void (*JIT_CheckedWriteBarrier_End)();
+
 //---------------------------------------------------------------------------
 // One-time initialization. Called during Dll initialization. So
 // be careful what you do in here!
@@ -1367,19 +1377,25 @@ void InitThreadManager()
     // If you hit this assert on retail build, there is most likely problem with BBT script.
     _ASSERTE_ALL_BUILDS("clr/src/VM/threads.cpp", (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart < (ptrdiff_t)GetOsPageSize());
 
-    // I am using virtual protect to cover the entire range that this code falls in.
-    // 
-
     // We could reset it to non-writeable inbetween GCs and such, but then we'd have to keep on re-writing back and forth, 
     // so instead we'll leave it writable from here forward.
 
-    DWORD oldProt;
-    if (!ClrVirtualProtect((void *)JIT_PatchedCodeStart, (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart,
-                           PAGE_EXECUTE_READWRITE, &oldProt))
+    BYTE* barriersPage = (BYTE*)ClrVirtualAlloc(NULL, GetOsPageSize(), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    if (barriersPage == NULL)
     {
-        _ASSERTE(!"ClrVirtualProtect of code page failed");
+        _ASSERTE(!"ClrVirtualAlloc of write barriers code page failed");
         COMPlusThrowWin32();
     }
+
+    memcpy_s(barriersPage, GetOsPageSize(), JIT_PatchedCodeStart, (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart);
+
+    JIT_WriteBarrier = (decltype(JIT_WriteBarrier))(barriersPage + ((BYTE*)JIT_WriteBarrier_Template - (BYTE*)JIT_PatchedCodeStart));
+    JIT_WriteBarrier_End = (decltype(JIT_WriteBarrier_End))(barriersPage + ((BYTE*)JIT_WriteBarrier_Template_End - (BYTE*)JIT_PatchedCodeStart));
+    JIT_CheckedWriteBarrier = (decltype(JIT_CheckedWriteBarrier))(barriersPage + ((BYTE*)JIT_CheckedWriteBarrier_Template - (BYTE*)JIT_PatchedCodeStart));
+    JIT_CheckedWriteBarrier_End = (decltype(JIT_CheckedWriteBarrier_End))(barriersPage + ((BYTE*)JIT_CheckedWriteBarrier_Template_End - (BYTE*)JIT_PatchedCodeStart));
+
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF, *JIT_WriteBarrier);
+    //SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF, *JIT_CheckedWriteBarrier);
 
 #ifndef FEATURE_PAL
 

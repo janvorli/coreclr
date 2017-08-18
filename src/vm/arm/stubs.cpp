@@ -28,10 +28,10 @@
 #include "threadsuspend.h"
 
 // target write barriers
-EXTERN_C void JIT_WriteBarrier(Object **dst, Object *ref);
-EXTERN_C void JIT_WriteBarrier_End();
-EXTERN_C void JIT_CheckedWriteBarrier(Object **dst, Object *ref);
-EXTERN_C void JIT_CheckedWriteBarrier_End();
+EXTERN_C void (JIT_WriteBarrier*)(Object **dst, Object *ref);
+EXTERN_C void (JIT_WriteBarrier_End*)();
+EXTERN_C void (JIT_CheckedWriteBarrier*)(Object **dst, Object *ref);
+EXTERN_C void (JIT_CheckedWriteBarrier_End*)();
 EXTERN_C void JIT_ByRefWriteBarrier_End();
 EXTERN_C void JIT_ByRefWriteBarrier_SP(Object **dst, Object *ref);
 
