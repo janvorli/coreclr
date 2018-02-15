@@ -156,7 +156,6 @@ namespace System.Runtime
             if (sizeInMegabytes <= 0)
                 throw new ArgumentOutOfRangeException(nameof(sizeInMegabytes), SR.ArgumentOutOfRange_NeedNonNegNum);
 
-#if !FEATURE_PAL // Remove this when CheckForAvailableMemory is able to provide legitimate estimates
             ulong size = ((ulong)sizeInMegabytes) << 20;
             _reservedMemory = size;
 
@@ -309,7 +308,6 @@ namespace System.Runtime
 
             SharedStatics.AddMemoryFailPointReservation((long)size);
             _mustSubtractReservation = true;
-#endif
         }
 
         private static void CheckForAvailableMemory(out ulong availPageFile, out ulong totalAddressSpaceFree)
@@ -356,6 +354,7 @@ namespace System.Runtime
         // this check if we use a MemoryFailPoint with a smaller size next.
         private static unsafe ulong MemFreeAfterAddress(void* address, ulong size)
         {
+#if !FEATURE_PAL
             if (size >= TopOfMemory)
                 return 0;
 
@@ -380,6 +379,9 @@ namespace System.Runtime
                 address = (void*)((ulong)address + regionSize);
             }
             return largestFreeRegion;
+#else
+            return Win32Native.PAL_MemFreeAfterAddress(address, size);
+#endif
         }
 
         [MethodImpl(MethodImplOptions.InternalCall)]

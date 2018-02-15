@@ -4590,6 +4590,14 @@ PAL_InjectActivation(
     IN HANDLE hThread
 );
 
+PALIMPORT
+SIZE_T
+PALAPI
+PAL_MemFreeAfterAddress(
+    IN PVOID address,
+    IN SIZE_T size
+);
+
 #define VER_PLATFORM_WIN32_WINDOWS        1
 #define VER_PLATFORM_WIN32_NT        2
 #define VER_PLATFORM_UNIX            10

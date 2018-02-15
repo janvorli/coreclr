@@ -40,6 +40,8 @@ check_include_files(pthread_np.h HAVE_PTHREAD_NP_H)
 check_include_files("sys/auxv.h;asm/hwcap.h" HAVE_AUXV_HWCAP_H)
 check_include_files("libintl.h" HAVE_LIBINTL_H)
 
+check_library_exists(procstat procstat_open_sysctl "" HAVE_LIBPROCSTAT)
+
 if(NOT CMAKE_SYSTEM_NAME STREQUAL FreeBSD AND NOT CMAKE_SYSTEM_NAME STREQUAL NetBSD)
   set(CMAKE_REQUIRED_FLAGS "-ldl")
 endif()

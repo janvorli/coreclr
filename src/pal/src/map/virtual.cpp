@@ -43,7 +43,17 @@ SET_DEFAULT_DEBUG_CHANNEL(VIRTUAL); // some headers have code with asserts, so d
 #if HAVE_VM_ALLOCATE
 #include <mach/vm_map.h>
 #include <mach/mach_init.h>
+#include <mach/mach.h>
+#include <mach/mach_vm.h>
 #endif // HAVE_VM_ALLOCATE
+
+#if HAVE_LIBPROCSTAT
+#include <sys/param.h>
+#include <sys/queue.h>
+#include <sys/user.h>
+#include <sys/sysctl.h>
+#include <libprocstat.h>
+#endif // HAVE_LIBPROCSTAT
 
 using namespace CorUnix;
 
@@ -2050,6 +2060,169 @@ ResetWriteWatch(
     // TODO: implement this method
     // Until it is implemented, return non-zero value as an indicator of failure
     return 1;
+}
+
+// Callback function type for the EnumerateVirtualMemoryRegions.
+typedef BOOL (*MemoryRegionCallback)(PVOID arg, PVOID regionStart, PVOID regionEnd);
+
+/*++
+Function:
+  EnumerateVirtualMemoryRegions
+
+  Call the specified callback for for each mapped region of the virtual memory. The regions are
+  enumerated in ascending manner.
+--*/
+VOID
+EnumerateVirtualMemoryRegions(MemoryRegionCallback callback, PVOID callbackArg)
+{
+#if __APPLE__
+
+    vm_region_basic_info_data_64_t info;
+    vm_size_t size;
+    vm_address_t address = 0;
+    mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+    mach_port_t port;
+
+    while (vm_region_64(mach_task_self(), &address, &size, VM_REGION_BASIC_INFO_64, (vm_region_info_t)&info, &count, &port) == KERN_SUCCESS)
+    {
+        if (!callback(callbackArg, (PVOID)address, (PVOID)(address + size)))
+        {
+            break;
+        }
+        address += size;
+    }
+
+#elif HAVE_LIBPROCSTAT
+
+    kinfo_proc info;
+    size_t size = sizeof(info);
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+
+    if (sysctl(mib, sizeof(mib)/sizeof(*mib), &info, &size, NULL, 0) == 0)
+    {
+        struct procstat *stat = procstat_open_sysctl();
+
+        if (stat != NULL)
+        {
+            unsigned int entryCount;
+            kinfo_vmentry* entries = procstat_getvmmap(stat, &info, &entryCount);
+            if (entries != NULL)
+            {
+                for (unsigned int i = 0; i < entryCount; i++)
+                {
+                    if (!callback(callbackArg, (PVOID)entries[i].kve_start, (PVOID)entries[i].kve_end))
+                    {
+                        break;
+                    }
+                }
+
+                procstat_freevmmap(stat, entries);
+            }
+
+            procstat_close(stat);
+        }
+    }
+
+#elif HAVE_PROCFS_MAPS
+
+    FILE* mapsFile = fopen("/proc/self/maps", "r");
+    if (mapsFile != NULL)
+    {
+        char *line = NULL;
+        size_t lineLen = 0;
+
+        while (getline(&line, &lineLen, mapsFile) != -1)
+        {
+            PVOID regionStart;
+            PVOID regionEnd;
+
+            int entries = sscanf_s(line, "%p-%p ", &regionStart, &regionEnd);
+            _ASSERTE(entries == 2);
+
+            if (!callback(callbackArg, regionStart, regionEnd))
+            {
+                break;
+            }
+        }
+
+        free(line);
+        fclose(mapsFile);
+    }
+
+#endif // _APPLE_
+}
+
+// Arguments passed to each invocation of the MemFreeAfterAddressCallback
+struct MemFreeAfterAddressArg
+{
+    PVOID address;
+    SIZE_T size;
+    SIZE_T largestSize;
+};
+
+/*++
+Function:
+    MemFreeAfterAddressCallback
+
+    Callback function called for each mapped memory block by the EnumerateVirtualMemoryRegions
+    for the PAL_MemFreeAfterAddress
+
+--*/
+BOOL MemFreeAfterAddressCallback(PVOID arg, PVOID regionStart, PVOID regionEnd)
+{
+    MemFreeAfterAddressArg* realArg = (MemFreeAfterAddressArg*)arg;
+
+    if (realArg->address >= regionEnd)
+    {
+        // Skip all regions below the requested address
+        return TRUE;
+    }
+
+    if (realArg->address < regionStart)
+    {
+        // The address is below the region, so the free space is located from that address upto the region start
+        SIZE_T freeSpace = (BYTE*)regionStart - (BYTE*)realArg->address;
+        if (freeSpace > realArg->largestSize)
+        {
+            realArg->largestSize = freeSpace;
+        }
+
+        if (realArg->largestSize >= realArg->size)
+        {
+            // We have found a free block of the requested size
+            return FALSE;
+        }
+    }
+
+    // Move the realArg->address after the region for the next check
+    realArg->address = regionEnd;
+
+    return TRUE;
+}
+
+/*++
+Function:
+    PAL_MemFreeAfterAddress
+
+    Find free region of virtual memory after the specified address. Try to find region of at least the specified size,
+    but if no such region is found, return size of the largest region that was found.
+
+--*/
+SIZE_T 
+PALAPI
+PAL_MemFreeAfterAddress(
+  IN PVOID address,
+  IN SIZE_T size 
+)
+{
+    MemFreeAfterAddressArg arg;
+    arg.address = address;
+    arg.size = size;
+    arg.largestSize = 0;
+
+    EnumerateVirtualMemoryRegions(MemFreeAfterAddressCallback, &arg);
+
+    return arg.largestSize;
 }
 
 /*++

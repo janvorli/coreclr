@@ -263,6 +263,10 @@ namespace Microsoft.Win32
         [DllImport(Interop.Libraries.Kernel32, SetLastError = true, EntryPoint = "GlobalMemoryStatusEx")]
         private static extern bool GlobalMemoryStatusExNative([In, Out] ref MEMORYSTATUSEX buffer);
 
+#if FEATURE_PAL
+        [DllImport(Interop.Libraries.MSCORWKS, EntryPoint = "PAL_MemFreeAfterAddress")]
+        private static extern ulong PAL_MemFreeAfterAddress(void* address, ulong size);
+#endif
         [DllImport(Interop.Libraries.Kernel32, SetLastError = true)]
         unsafe internal static extern UIntPtr VirtualQuery(void* address, ref MEMORY_BASIC_INFORMATION buffer, UIntPtr sizeOfBuffer);
 

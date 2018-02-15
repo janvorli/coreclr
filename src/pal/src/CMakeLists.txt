@@ -264,11 +264,13 @@ endif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
 if(CMAKE_SYSTEM_NAME STREQUAL FreeBSD)
   find_library(UNWIND unwind)
   find_library(INTL intl)
+  find_library(PROCSTAT procstat)
   target_link_libraries(coreclrpal
     pthread
     rt
     ${UNWIND}
     ${INTL}
+    ${PROCSTAT}
   )
 endif(CMAKE_SYSTEM_NAME STREQUAL FreeBSD)
 

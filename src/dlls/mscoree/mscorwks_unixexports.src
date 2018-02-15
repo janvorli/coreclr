@@ -54,6 +54,7 @@ OpenEventW
 OpenMutexW
 OpenSemaphoreW
 OutputDebugStringW
+PAL_MemFreeAfterAddress
 QueryPerformanceCounter  
 QueryPerformanceFrequency
 RaiseException
