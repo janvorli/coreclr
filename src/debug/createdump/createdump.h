@@ -9,6 +9,8 @@
 #define _countof(x) (sizeof(x)/sizeof(x[0]))
 #endif
 
+#define PAGE_SHIFT 12
+
 extern bool g_diagnostics;
 
 #define TRACE(args...) \
