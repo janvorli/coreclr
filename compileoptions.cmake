@@ -1,7 +1,6 @@
 if (CLR_CMAKE_PLATFORM_UNIX)
   # Disable frame pointer optimizations so profilers can get better call stacks
   add_compile_options(-fno-omit-frame-pointer)
-
   # The -fms-extensions enable the stuff like __if_exists, __declspec(uuid()), etc.
   add_compile_options(-fms-extensions )
   #-fms-compatibility      Enable full Microsoft Visual C++ compatibility
