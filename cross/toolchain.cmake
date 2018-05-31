@@ -13,15 +13,17 @@ if(TARGET_ARCH_NAME STREQUAL "armel")
   endif()
 elseif(TARGET_ARCH_NAME STREQUAL "arm")
   set(CMAKE_SYSTEM_PROCESSOR armv7l)
-  set(TOOLCHAIN "arm-linux-gnueabihf")
   if(EXISTS ${CROSS_ROOTFS}/usr/lib/gcc/armv6-alpine-linux-musleabihf)
     set(TOOLCHAIN "armv6-alpine-linux-musleabihf")
+  else()
+    set(TOOLCHAIN "arm-linux-gnueabihf")
   endif()
 elseif(TARGET_ARCH_NAME STREQUAL "arm64")
   set(CMAKE_SYSTEM_PROCESSOR aarch64)
-  set(TOOLCHAIN "aarch64-linux-gnu")
   if(EXISTS ${CROSS_ROOTFS}/usr/lib/gcc/aarch64-alpine-linux-musl)
     set(TOOLCHAIN "aarch64-alpine-linux-musl")
+  else()
+    set(TOOLCHAIN "aarch64-linux-gnu")
   endif()
 elseif(TARGET_ARCH_NAME STREQUAL "x86")
   set(CMAKE_SYSTEM_PROCESSOR i686)
@@ -36,8 +38,6 @@ if(TARGET_ARCH_NAME STREQUAL "armel")
     include_directories(SYSTEM ${CROSS_ROOTFS}/usr/lib/gcc/${TIZEN_TOOLCHAIN}/include/c++/)
     include_directories(SYSTEM ${CROSS_ROOTFS}/usr/lib/gcc/${TIZEN_TOOLCHAIN}/include/c++/armv7l-tizen-linux-gnueabi)
   endif()
-elseif(TARGET_ARCH_NAME STREQUAL "arm")
-elseif(TARGET_ARCH_NAME STREQUAL "arm64")
 endif()
 
 # add_compile_param - adds only new options without duplicates.
@@ -60,6 +60,7 @@ endmacro()
 add_compile_param(CROSS_LINK_FLAGS "--gcc-toolchain=${CROSS_ROOTFS}/usr")
 # Specify link flags
 add_compile_param(CROSS_LINK_FLAGS "-fuse-ld=gold")
+
 if(TARGET_ARCH_NAME STREQUAL "armel")
   if(DEFINED TIZEN_TOOLCHAIN) # For Tizen only
     add_compile_param(CROSS_LINK_FLAGS "-B${CROSS_ROOTFS}/usr/lib/gcc/${TIZEN_TOOLCHAIN}")
@@ -67,39 +68,34 @@ if(TARGET_ARCH_NAME STREQUAL "armel")
     add_compile_param(CROSS_LINK_FLAGS "-L${CROSS_ROOTFS}/usr/lib")
     add_compile_param(CROSS_LINK_FLAGS "-L${CROSS_ROOTFS}/usr/lib/gcc/${TIZEN_TOOLCHAIN}")
   endif()
-elseif(TARGET_ARCH_NAME MATCHES "^(arm|arm64)$")
-else() # x86 case
+elseif(TARGET_ARCH_NAME STREQUAL "x86")
   add_compile_param(CROSS_LINK_FLAGS "-m32")
 endif()
+
 add_compile_param(CMAKE_EXE_LINKER_FLAGS "${CROSS_LINK_FLAGS}" "TOOLCHAIN_EXE_LINKER_FLAGS")
 add_compile_param(CMAKE_SHARED_LINKER_FLAGS "${CROSS_LINK_FLAGS}" "TOOLCHAIN_EXE_LINKER_FLAGS")
 add_compile_param(CMAKE_MODULE_LINKER_FLAGS "${CROSS_LINK_FLAGS}" "TOOLCHAIN_EXE_LINKER_FLAGS")
 
-
-add_compile_options("--gcc-toolchain=${CROSS_ROOTFS}/usr")
 # Specify compile options
+add_compile_options("--gcc-toolchain=${CROSS_ROOTFS}/usr")
+
+if(TARGET_ARCH_NAME MATCHES "^(arm|armel|arm64)$")
+  set(CMAKE_C_COMPILER_TARGET ${TOOLCHAIN})
+  set(CMAKE_CXX_COMPILER_TARGET ${TOOLCHAIN})
+  set(CMAKE_ASM_COMPILER_TARGET ${TOOLCHAIN})
+endif
+
 if(TARGET_ARCH_NAME MATCHES "^(arm|armel)$")
   add_compile_options(-mthumb)
   add_compile_options(-mfpu=vfpv3)
   if(TARGET_ARCH_NAME STREQUAL "armel")
-    set(CMAKE_C_COMPILER_TARGET ${TOOLCHAIN})
-    set(CMAKE_CXX_COMPILER_TARGET ${TOOLCHAIN})
-    set(CMAKE_ASM_COMPILER_TARGET ${TOOLCHAIN})
     add_compile_options(-mfloat-abi=softfp)
     if(DEFINED TIZEN_TOOLCHAIN)
       add_compile_options(-Wno-deprecated-declarations) # compile-time option
       add_compile_options(-D__extern_always_inline=inline) # compile-time option
     endif()
-  else() # arm case
-    set(CMAKE_C_COMPILER_TARGET ${TOOLCHAIN})
-    set(CMAKE_CXX_COMPILER_TARGET ${TOOLCHAIN})
-    set(CMAKE_ASM_COMPILER_TARGET ${TOOLCHAIN})
   endif()
-elseif(TARGET_ARCH_NAME STREQUAL "arm64")
-  set(CMAKE_C_COMPILER_TARGET ${TOOLCHAIN})
-  set(CMAKE_CXX_COMPILER_TARGET ${TOOLCHAIN})
-  set(CMAKE_ASM_COMPILER_TARGET ${TOOLCHAIN})
-else() # x86 case
+elseif(TARGET_ARCH_NAME STREQUAL "x86")
   add_compile_options(-m32)
   add_compile_options(-Wno-error=unused-command-line-argument)
 endif()
