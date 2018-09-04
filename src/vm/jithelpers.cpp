@@ -4787,6 +4787,26 @@ HCIMPLEND
 
 /*************************************************************/
 
+void TestUnwindStack()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+        SO_TOLERANT;
+    }
+    CONTRACTL_END;
+
+    CONTEXT context;
+    RtlCaptureContext(&context);
+    PCODE uControlPc = GetIP(&context);
+
+    while (uControlPc != 0)
+    {
+        uControlPc = Thread::VirtualUnwindCallFrame(&context);
+    }
+}
+
 HCIMPL1(void, IL_Throw,  Object* obj)
 {
     FCALL_CONTRACT;
@@ -4857,6 +4877,7 @@ HCIMPL1(void, IL_Throw,  Object* obj)
     }
 #endif // FEATURE_CORRUPTING_EXCEPTIONS
 
+    TestUnwindStack();
     RaiseTheExceptionInternalOnly(oref, FALSE);
 
     HELPER_METHOD_FRAME_END();

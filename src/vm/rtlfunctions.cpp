@@ -19,7 +19,7 @@
 
 #ifdef _TARGET_AMD64_
 
-RtlVirtualUnwindFn*                 RtlVirtualUnwind_Unsafe         = NULL;
+//RtlVirtualUnwindFn*                 RtlVirtualUnwind_Unsafe         = NULL;
 
 HRESULT EnsureRtlFunctions()
 {
@@ -41,7 +41,7 @@ HRESULT EnsureRtlFunctions()
     if (NULL == clrname) { return E_FAIL; } \
     { }
 
-    ENSURE_FUNCTION_RENAME(RtlVirtualUnwind_Unsafe, RtlVirtualUnwind       );
+    //ENSURE_FUNCTION_RENAME(RtlVirtualUnwind_Unsafe, RtlVirtualUnwind       );
 
     return S_OK;
 }

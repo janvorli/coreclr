@@ -65,9 +65,9 @@ add_dependencies(coreclr coreclr_exports)
 set_property(TARGET coreclr APPEND_STRING PROPERTY LINK_FLAGS ${EXPORTS_LINKER_OPTION})
 set_property(TARGET coreclr APPEND_STRING PROPERTY LINK_DEPENDS ${EXPORTS_FILE})
 
-if (CLR_CMAKE_PLATFORM_UNIX)
+#if (CLR_CMAKE_PLATFORM_UNIX)
     set(LIB_UNWINDER unwinder_wks)
-endif (CLR_CMAKE_PLATFORM_UNIX)
+#endif (CLR_CMAKE_PLATFORM_UNIX)
 
 if(FEATURE_MERGE_JIT_AND_ENGINE)
     set(CLRJIT_STATIC clrjit_static)

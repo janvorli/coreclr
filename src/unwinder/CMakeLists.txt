@@ -23,8 +23,8 @@ if(CLR_CMAKE_PLATFORM_UNIX)
     add_compile_options(-fPIC)
 endif(CLR_CMAKE_PLATFORM_UNIX)
 
-if(CLR_CMAKE_PLATFORM_UNIX)    
+#if(CLR_CMAKE_PLATFORM_UNIX)    
     add_subdirectory(wks)
-endif(CLR_CMAKE_PLATFORM_UNIX)
+#endif(CLR_CMAKE_PLATFORM_UNIX)
 
 add_subdirectory(dac)

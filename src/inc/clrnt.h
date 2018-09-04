@@ -811,9 +811,9 @@ PEXCEPTION_ROUTINE
     IN OUT PKNONVOLATILE_CONTEXT_POINTERS ContextPointers OPTIONAL
     );
 
-#ifndef FEATURE_PAL
-extern RtlVirtualUnwindFn* RtlVirtualUnwind_Unsafe;
-#else // !FEATURE_PAL
+//#ifndef FEATURE_PAL
+//extern RtlVirtualUnwindFn* RtlVirtualUnwind_Unsafe;
+//#else // !FEATURE_PAL
 PEXCEPTION_ROUTINE
 RtlVirtualUnwind_Unsafe(
     IN ULONG HandlerType,
@@ -825,7 +825,7 @@ RtlVirtualUnwind_Unsafe(
     OUT PULONG64 EstablisherFrame,
     IN OUT PKNONVOLATILE_CONTEXT_POINTERS ContextPointers OPTIONAL
     );
-#endif // !FEATURE_PAL
+//#endif // !FEATURE_PAL
 
 #endif // _TARGET_AMD64_
 
