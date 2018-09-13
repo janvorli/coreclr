@@ -503,7 +503,7 @@ void    ThreadLocalModule::AllocateDynamicClass(MethodTable *pMT)
         if (pDynamicStatics == NULL)
         {            
             SIZE_T dynamicEntrySize;
-        if (pMT->Collectible())
+            if (pMT->Collectible())
             {
                 dynamicEntrySize = sizeof(CollectibleDynamicEntry);
             }
@@ -548,10 +548,10 @@ void    ThreadLocalModule::AllocateDynamicClass(MethodTable *pMT)
         {
             if (!pMT->Collectible())
             {
-            PTR_ThreadLocalBlock pThreadLocalBlock = GetThread()->m_pThreadLocalBlock;
-            _ASSERTE(pThreadLocalBlock != NULL);
-            pThreadLocalBlock->AllocateStaticFieldObjRefPtrs(dwNumHandleStatics,
-                    &((NormalDynamicEntry *)pDynamicStatics)->m_pGCStatics);
+                PTR_ThreadLocalBlock pThreadLocalBlock = GetThread()->m_pThreadLocalBlock;
+                _ASSERTE(pThreadLocalBlock != NULL);
+                pThreadLocalBlock->AllocateStaticFieldObjRefPtrs(dwNumHandleStatics,
+                        &((NormalDynamicEntry *)pDynamicStatics)->m_pGCStatics);
             }
             else
             {

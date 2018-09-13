@@ -2887,7 +2887,7 @@ PCODE DynamicHelperFixup(TransitionBlock * pTransitionBlock, TADDR * pCell, DWOR
                     {
                         if (pFD != NULL)
                         {
-                            if (pFD->IsRVA() || pFD->IsContextStatic())
+                            if (pFD->IsRVA())
                             {
                                 _ASSERTE(!"Fast getter for rare kinds of static fields");
                             }
