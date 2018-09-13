@@ -3822,13 +3822,13 @@ VOID    MethodTableBuilder::InitializeFieldDescs(FieldDesc *pFieldDescList,
                 IfFailThrow(COR_E_TYPELOAD);
             }
 
-            if ((fIsThreadStatic || fIsContextStatic || bmtFP->fHasFixedAddressValueTypes) && GetAssembly()->IsCollectible())
+            if ((fIsContextStatic || bmtFP->fHasFixedAddressValueTypes) && GetAssembly()->IsCollectible())
             {
                 if (bmtFP->fHasFixedAddressValueTypes)
                 {
                     BuildMethodTableThrowException(IDS_CLASSLOAD_COLLECTIBLEFIXEDVTATTR);
                 }
-                BuildMethodTableThrowException(IDS_CLASSLOAD_COLLECTIBLESPECIALSTATICS);
+                //BuildMethodTableThrowException(IDS_CLASSLOAD_COLLECTIBLESPECIALSTATICS);
             }
         }
 
@@ -6516,7 +6516,6 @@ VOID MethodTableBuilder::PlaceInterfaceDeclarationOnClass(
         pDecl->GetSlotIndex(), 
         pImpl);
 
-#ifdef FEATURE_PREJIT
     if (IsCompilationProcess())
     {
         //
@@ -6528,7 +6527,6 @@ VOID MethodTableBuilder::PlaceInterfaceDeclarationOnClass(
             pDeclMT->GetWriteableDataForWrite()->SetIsOverridingInterface();
         }
     }
-#endif
     
 #ifdef _DEBUG
     if (bmtInterface->dbg_fShouldInjectInterfaceDuplicates)
@@ -6796,10 +6794,8 @@ VOID MethodTableBuilder::AllocAndInitMethodDescs()
             }
         }
 
-#ifndef CROSSGEN_COMPILE
         if (tokenRange != currentTokenRange ||
             sizeOfMethodDescs + size > MethodDescChunk::MaxSizeOfMethodDescs)
-#endif // CROSSGEN_COMPILE
         {
             if (sizeOfMethodDescs != 0)
             {
