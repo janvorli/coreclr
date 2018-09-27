@@ -1101,7 +1101,7 @@ ProcessCLRException(IN     PEXCEPTION_RECORD   pExceptionRecord
             pThread,
             STState
 #ifdef USE_PER_FRAME_PINVOKE_INIT
-            , (PVOID)pICFSetAsLimitFrame
+            , (PVOID *)&pICFSetAsLimitFrame
 #endif // USE_PER_FRAME_PINVOKE_INIT
             );
 
@@ -1677,7 +1677,7 @@ CLRUnwindStatus ExceptionTracker::ProcessOSExceptionNotification(
     Thread* pThread,
     StackTraceState STState
 #ifdef USE_PER_FRAME_PINVOKE_INIT
-    , PVOID pICFSetAsLimitFrame
+    , PVOID * pICFSetAsLimitFrame
 #endif // USE_PER_FRAME_PINVOKE_INIT
 )
 {
@@ -1992,7 +1992,7 @@ lExit:
         if (pICFForUnwindTarget != NULL)
         {
             m_pLimitFrame = pICFForUnwindTarget;
-            pICFSetAsLimitFrame = (PVOID)pICFForUnwindTarget;
+            *pICFSetAsLimitFrame = (PVOID)pICFForUnwindTarget;
         }
 #endif // USE_PER_FRAME_PINVOKE_INIT
 

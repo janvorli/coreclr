@@ -197,7 +197,7 @@ public:
         Thread* pThread,
         StackTraceState STState
 #ifdef USE_PER_FRAME_PINVOKE_INIT
-        , PVOID pICFSetAsLimitFrame
+        , PVOID * pICFSetAsLimitFrame
 #endif // USE_PER_FRAME_PINVOKE_INIT
         );
 
