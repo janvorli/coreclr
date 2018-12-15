@@ -20,7 +20,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #endif
-#if defined(HAVE_SYS_SYSCTL_H) || defined(__FreeBSD__)
+#if HAVE_SYS_SYSCTL_H || defined(__FreeBSD__)
 #include <sys/sysctl.h>
 #endif
 #include "coreruncommon.h"
