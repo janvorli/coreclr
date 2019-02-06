@@ -890,7 +890,7 @@ CONTEXT_GetThreadContextFromPort(
   
     if (lpContext->ContextFlags & (CONTEXT_CONTROL | CONTEXT_INTEGER | CONTEXT_SEGMENTS) & CONTEXT_AREA_MASK)
     {
-#ifdef _X86_  
+#ifdef _X86_
         x86_thread_state32_t State;
         StateFlavor = x86_THREAD_STATE32;
 #elif defined(_AMD64_)
@@ -911,41 +911,38 @@ CONTEXT_GetThreadContextFromPort(
     }
     
     if (lpContext->ContextFlags & CONTEXT_ALL_FLOATING & CONTEXT_AREA_MASK) {
-#ifdef _X86_
-        x86_float_state32_t State;
-        StateFlavor = x86_FLOAT_STATE32;
-#elif defined(_AMD64_)
-        x86_float_state64_t State;
-        StateFlavor = x86_FLOAT_STATE64;
-#else
-#error Unexpected architecture.
-#endif
-        StateCount = sizeof(State) / sizeof(natural_t);
-        MachRet = thread_get_state(Port, StateFlavor, (thread_state_t)&State, &StateCount);
-        if (MachRet != KERN_SUCCESS)
-        {
-            ASSERT("thread_get_state(FLOAT_STATE) failed: %d\n", MachRet);
-            goto exit;
-        }
-        
-        CONTEXT_GetThreadContextFromThreadState(StateFlavor, (thread_state_t)&State, lpContext);
-    }
+        // The thread_get_state for floating point state can fail for some flavors when the processor is not
+        // in the right mode at the time we are taking the state. So we will try to get the AVX state first and
+        // if it fails, get the FLOAT state.
 
-#if defined(_AMD64_) && defined(XSTATE_SUPPORTED)
-    if (lpContext->ContextFlags & CONTEXT_XSTATE & CONTEXT_AREA_MASK) {
+        // We're relying on the fact that the initial portion of
+        // x86_avx_state64_t is identical to x86_float_state64_t.
+        // Check a few fields to make sure the assumption is correct.
+        static_assert_no_msg(sizeof(x86_avx_state64_t) > sizeof(x86_float_state64_t));
+        static_assert_no_msg(offsetof(x86_avx_state64_t, __fpu_fcw) == offsetof(x86_float_state64_t, __fpu_fcw));
+        static_assert_no_msg(offsetof(x86_avx_state64_t, __fpu_xmm0) == offsetof(x86_float_state64_t, __fpu_xmm0));
         x86_avx_state64_t State;
+
         StateFlavor = x86_AVX_STATE64;
-        StateCount = sizeof(State) / sizeof(natural_t);
+        StateCount = sizeof(x86_avx_state64_t) / sizeof(natural_t);
         MachRet = thread_get_state(Port, StateFlavor, (thread_state_t)&State, &StateCount);
         if (MachRet != KERN_SUCCESS)
         {
-            ASSERT("thread_get_state(XSTATE) failed: %d\n", MachRet);
-            goto exit;
+            // There is no XSTATE available, so clear the CONTEXT_XSTATE flag and get at least
+            // the floating point registers.
+            lpContext->ContextFlags &= ~(CONTEXT_XSTATE & CONTEXT_AREA_MASK);
+            StateFlavor = x86_FLOAT_STATE64;
+            StateCount = sizeof(x86_float_state64_t) / sizeof(natural_t);
+            MachRet = thread_get_state(Port, StateFlavor, (thread_state_t)&State, &StateCount);
+            if (MachRet != KERN_SUCCESS)
+            {
+                ASSERT("thread_get_state(AVX_STATE, FLOAT_STATE) failed: %d\n", MachRet);
+                goto exit;
+            }
         }
 
         CONTEXT_GetThreadContextFromThreadState(StateFlavor, (thread_state_t)&State, lpContext);
     }
-#endif
 
 exit:
     return MachRet;
@@ -1058,6 +1055,7 @@ CONTEXT_GetThreadContextFromThreadState(
             break;
 
         case x86_FLOAT_STATE64:
+        case x86_AVX_STATE64:
             if (lpContext->ContextFlags & CONTEXT_FLOATING_POINT & CONTEXT_AREA_MASK)
             {
                 x86_float_state64_t *pState = (x86_float_state64_t *)threadState;
@@ -1082,17 +1080,12 @@ CONTEXT_GetThreadContextFromThreadState(
                 // AMD64's FLOATING_POINT includes the xmm registers.
                 memcpy(&lpContext->Xmm0, &pState->__fpu_xmm0, 16 * 16);
             }
-            break;
-
-#ifdef XSTATE_SUPPORTED
-        case x86_AVX_STATE64:
-            if (lpContext->ContextFlags & CONTEXT_XSTATE & CONTEXT_AREA_MASK)
+            if ((threadStateFlavor == x86_AVX_STATE64) && (lpContext->ContextFlags & CONTEXT_XSTATE & CONTEXT_AREA_MASK))
             {
                 x86_avx_state64_t *pState = (x86_avx_state64_t *)threadState;
                 memcpy(&lpContext->VectorRegister, &pState->__fpu_ymmh0, 16 * 16);
             }
             break;
-#endif
 #else
 #error Unexpected architecture.
 #endif
