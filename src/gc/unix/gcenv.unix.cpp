@@ -528,35 +528,36 @@ bool GCToOSInterface::GetCurrentProcessAffinityMask(uintptr_t* processAffinityMa
 //  The number of processors
 uint32_t GCToOSInterface::GetCurrentProcessCpuCount()
 {
-    uintptr_t pmask, smask;
-    uint32_t cpuLimit;
+    uint32_t cpuCount = 0;
+#if HAVE_PTHREAD_GETAFFINITY_NP
+    // Use affinity as the primary source of truth. That takes into account the possible limit
+    // on CPUs available for the current process imposed by taskset.
+    cpu_set_t cpuSet;
+    CPU_ZERO(&cpuSet);
 
-    if (!GetCurrentProcessAffinityMask(&pmask, &smask))
-        return 1;
+    int st = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuSet);
 
-    pmask &= smask;
-
-    int count = 0;
-    while (pmask)
+    if (st == 0)
     {
-        pmask &= (pmask - 1);
-        count++;
+        cpuCount = (uint32_t)CPU_COUNT(&cpuSet);
+    }
+#endif // HAVE_PTHREAD_GETAFFINITY_NP
+
+    if (cpuCount == 0)
+    {
+        // If the platform doesn't support pthread_getaffinity_np or if it has failed, get the total
+        // number of CPUs on the machine.
+        cpuCount = g_logicalCpuCount;
     }
 
-    // GetProcessAffinityMask can return pmask=0 and smask=0 on systems with more
-    // than 64 processors, which would leave us with a count of 0.  Since the GC
-    // expects there to be at least one processor to run on (and thus at least one
-    // heap), we'll return 64 here if count is 0, since there are likely a ton of
-    // processors available in that case.  The GC also cannot (currently) handle
-    // the case where there are more than 64 processors, so we will return a
-    // maximum of 64 here.
-    if (count == 0 || count > 64)
-        count = 64;
+    // Finally, limit the number of CPUs reported by the cgroups imposed limit
+    uint32_t cpuCountLimit;
+    if (GetCpuLimit(&cpuCountLimit) && cpuCountLimit < cpuCount)
+    {
+        cpuCount = cpuCountLimit;
+    }
 
-    if (GetCpuLimit(&cpuLimit) && cpuLimit < count)
-        count = cpuLimit;
-
-    return count;
+    return cpuCount;
 }
 
 // Return the size of the user-mode portion of the virtual address space of this process.

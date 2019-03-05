@@ -2440,6 +2440,11 @@ PALAPI
 PAL_GetCpuLimit(UINT* val);
 
 PALIMPORT
+int
+PALAPI
+PAL_GetCurrentProcessCpuCount();
+
+PALIMPORT
 size_t
 PALAPI
 PAL_GetLogicalProcessorCacheSizeFromOS(VOID);

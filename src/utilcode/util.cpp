@@ -1209,6 +1209,8 @@ int GetCurrentProcessCpuCount()
         return cCPUs;
 
     int count = 0;
+
+#ifndef FEATURE_PAL
     DWORD_PTR pmask, smask;
 
     if (!GetProcessAffinityMask(GetCurrentProcess(), &pmask, &smask))
@@ -1236,12 +1238,14 @@ int GetCurrentProcessCpuCount()
             count = 64;
     }
 
-#ifdef FEATURE_PAL
-    uint32_t cpuLimit;
+#else // !FEATURE_PAL
+    // On PAL, we cannot rely on the GetProcessAffinityMask as it returns 0 for processes
+    // spanning multiple NUMA nodes. Windows never start processes with affinity to 
+    // processors in multiple NUMA nodes, it is only possible to move threads
+    // to other NUMA nodes later using the SetThreadIdealProcessorEx.
 
-    if (PAL_GetCpuLimit(&cpuLimit) && cpuLimit < count)
-        count = cpuLimit;
-#endif
+    count = PAL_GetCurrentProcessCpuCount();
+#endif // !FEATURE_PAL
 
     cCPUs = count;
 

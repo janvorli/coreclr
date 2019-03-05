@@ -474,3 +474,40 @@ PAL_GetCpuLimit(UINT* val)
 
     return CGroup::GetCpuLimit(val);
 }
+
+PALIMPORT
+int
+PALAPI
+PAL_GetCurrentProcessCpuCount()
+{
+    int cpuCount = 0;
+#if HAVE_PTHREAD_GETAFFINITY_NP
+    // Use affinity as the primary source of truth. That takes into account the possible limit
+    // on CPUs available for the current process imposed by taskset.
+    cpu_set_t cpuSet;
+    CPU_ZERO(&cpuSet);
+
+    int st = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuSet);
+
+    if (st == 0)
+    {
+        cpuCount = CPU_COUNT(&cpuSet);
+    }
+#endif // HAVE_PTHREAD_GETAFFINITY_NP
+
+    if (cpuCount == 0)
+    {
+        // If the platform doesn't support pthread_getaffinity_np or if it has failed, get the total
+        // number of CPUs on the machine.
+        cpuCount = (int)PAL_GetLogicalCpuCountFromOS();
+    }
+
+    // Finally, limit the number of CPUs reported by the cgroups imposed limit
+    UINT cpuCountLimit;
+    if (PAL_GetCpuLimit(&cpuCountLimit) && cpuCountLimit < (UINT)cpuCount)
+    {
+        cpuCount = (int)cpuCountLimit;
+    }
+
+    return cpuCount;
+}
