@@ -497,6 +497,7 @@ void ZapInfo::CompileMethod()
     if (FAILED(res))
     {
         ICorJitCompiler * pCompiler = m_zapper->m_pJitCompiler;
+        wprintf(L"Compiling %s\n", m_currentMethodName.GetUnicode());
         res = pCompiler->compileMethod(this,
                                     &m_currentMethodInfo,
                                     CORJIT_FLAGS::CORJIT_FLAG_CALL_GETJITFLAGS,

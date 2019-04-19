@@ -475,6 +475,7 @@ public:
         }
         else
         {
+            wprintf(L"ZapExternalMethodThunk::EncodeSignature             ");
             pTable->EncodeMethod(ENCODE_METHOD_ENTRY, handle, pSigBuilder);
         }
     }
@@ -713,6 +714,7 @@ public:
         }
         else
         {
+            wprintf(L"ZapExternalMethodCell::EncodeSignature              ");
             pTable->EncodeMethod(ENCODE_METHOD_ENTRY, handle, pSigBuilder);
         }
     }
@@ -1159,6 +1161,7 @@ public:
 
     virtual void EncodeSignature(ZapImportTable * pTable, SigBuilder * pSigBuilder)
     {
+        wprintf(L"ZapMethodHandleImport::EncodeSignature              ");
         pTable->EncodeMethod(ENCODE_METHOD_HANDLE, (CORINFO_METHOD_HANDLE)GetHandle(), pSigBuilder);
     }
 
@@ -1266,6 +1269,7 @@ public:
         }
         else
         {
+            wprintf(L"ZapFunctionEntryImport::EncodeSignature             ");
             pTable->EncodeMethod(ENCODE_METHOD_ENTRY, handle, pSigBuilder);
         }
     }
@@ -1392,6 +1396,7 @@ public:
 
     virtual void EncodeSignature(ZapImportTable * pTable, SigBuilder * pSigBuilder)
     {
+        wprintf(L"ZapIndirectPInvokeTargetImport::EncodeSignature     ");
         pTable->EncodeMethod(ENCODE_INDIRECT_PINVOKE_TARGET, (CORINFO_METHOD_HANDLE)GetHandle(), pSigBuilder);
     }
 };
@@ -1411,6 +1416,7 @@ public:
 
     virtual void EncodeSignature(ZapImportTable * pTable, SigBuilder * pSigBuilder)
     {
+        wprintf(L"ZapProfilingHandleImport::EncodeSignature           ");
         pTable->EncodeMethod(ENCODE_PROFILING_HANDLE, (CORINFO_METHOD_HANDLE)GetHandle(), pSigBuilder);
     }
 
@@ -1525,6 +1531,7 @@ ZapImport * ZapImportTable::GetClassImport(CORCOMPILE_FIXUP_BLOB_KIND kind, CORI
 ZapImport * ZapImportTable::GetMethodImport(CORCOMPILE_FIXUP_BLOB_KIND kind, CORINFO_METHOD_HANDLE handle, 
     CORINFO_RESOLVED_TOKEN * pResolvedToken, CORINFO_RESOLVED_TOKEN * pConstrainedResolvedToken /*=NULL*/)
 {
+    wprintf(L"ZapImportTable::GetMethodImport                     ");
     SigBuilder sigBuilder;
     EncodeMethod(kind, handle, &sigBuilder, pResolvedToken, pConstrainedResolvedToken);
 
@@ -1611,6 +1618,7 @@ ZapImport * ZapImportTable::GetStubDispatchCell(CORINFO_RESOLVED_TOKEN * pResolv
         }
         else
         {
+            wprintf(L"ZapImportTable::GetStubDispatchCell                 ");
             EncodeMethod(ENCODE_VIRTUAL_ENTRY, handle, &sigBuilder, pResolvedToken);
         }
     }
@@ -1637,6 +1645,7 @@ ZapImport * ZapImportTable::GetExternalMethodCell(CORINFO_METHOD_HANDLE handle, 
     }
     else
     {
+        wprintf(L"ZapImportTable::GetExternalMethodCell               ");
         EncodeMethod(ENCODE_METHOD_ENTRY, handle, &sigBuilder, pResolvedToken, pConstrainedResolvedToken, false);
     }
 
@@ -1811,14 +1820,17 @@ ZapImport * ZapImportTable::GetDictionaryLookupCell(CORCOMPILE_FIXUP_BLOB_KIND k
         break;
 
     case READYTORUN_FIXUP_MethodHandle:
+        wprintf(L"ZapImportTable::GetDictionaryLookupCell MethodHandle");
         EncodeMethod(ENCODE_METHOD_HANDLE, pResolvedToken->hMethod, &sigBuilder, pResolvedToken, NULL, TRUE);
         break;
 
     case READYTORUN_FIXUP_MethodEntry:
+        wprintf(L"ZapImportTable::GetDictionaryLookupCell MethodEntry ");
         EncodeMethod(ENCODE_METHOD_ENTRY, pResolvedToken->hMethod, &sigBuilder, pResolvedToken, (CORINFO_RESOLVED_TOKEN*)pLookup->runtimeLookupArgs, TRUE);
         break;
 
     case READYTORUN_FIXUP_VirtualEntry:
+        wprintf(L"ZapImportTable::GetDictionaryLookupCell VirtualEntry");
         EncodeMethod(ENCODE_VIRTUAL_ENTRY, pResolvedToken->hMethod, &sigBuilder, pResolvedToken, NULL, TRUE);
         break;
 
@@ -1858,6 +1870,7 @@ ZapImport * ZapImportTable::GetDynamicHelperCell(CORCOMPILE_FIXUP_BLOB_KIND kind
 {
     SigBuilder sigBuilder;
 
+    wprintf(L"ZapImportTable::GetDynamicHelperCell                ");
     EncodeMethod((CORCOMPILE_FIXUP_BLOB_KIND)(kind & ~CORINFO_HELP_READYTORUN_ATYPICAL_CALLSITE),
         handle, &sigBuilder, pResolvedToken);
 

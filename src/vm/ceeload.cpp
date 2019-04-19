@@ -12806,7 +12806,7 @@ idMethodSpec Module::LogInstantiatedMethod(const MethodDesc * md, ULONG flagNum)
 
         // get data
         SigBuilder sigBuilder;
-
+        wprintf(L"Module::LogInstantiatedMethod                       ");
         BOOL fSuccess;
         fSuccess = ZapSig::EncodeMethod(const_cast<MethodDesc *>(md), this, &sigBuilder,
                                       (LPVOID) this,

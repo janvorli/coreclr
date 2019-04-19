@@ -1124,14 +1124,49 @@ BOOL ZapSig::EncodeMethod(
     CONTRACTL_END;
 
     TypeHandle ownerType;
+    bool takenCrossgenPath = false;
+
+    MethodTable *pMT = pMethod->GetMethodTable_NoLogging();
+    bool IsSharedByGenericInstantiations = pMethod->IsSharedByGenericInstantiations();
+    bool IsInterface = pMethod->IsInterface();
+    bool IsValueType = pMT->IsValueType();
+    bool HasInstantiation = pMT->HasInstantiation();
+    bool IsCanonicalMethodTable = pMT->IsCanonicalMethodTable();
+    bool IsVtableMethod = pMethod->IsVtableMethod();
 
 #ifdef FEATURE_READYTORUN_COMPILER
 
+    static int count = 0;
+
+    count++;
+
+    int countChangeFrom = 0;
+    int countChangeTo = 0;
+    char* cnt = getenv("CrossCountFrom");
+    if (cnt != NULL)
+    {
+        countChangeFrom = atoi(cnt);
+    }
+
+    cnt = getenv("CrossCountTo");
+    if (cnt != NULL)
+    {
+        countChangeTo = atoi(cnt);
+    }
     // For methods encoded outside of the version bubble, we use pResolvedToken which describes the metadata token from which the method originated
     // For tokens inside the version bubble we are not constrained by the contents of pResolvedToken and as such we skip this codepath
     // FUTURE: This condition should likely be changed or reevaluated once support for smaller version bubbles is implemented.
-    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble()))
+
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (pMT->IsSharedByGenericInstantiations() && pMT->IsInterface())))// || pMethod->GetMethodTable_NoLogging()->IsCanonicalMethodTable() && pMethod->GetMethodTable_NoLogging()->HasInstantiation()))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (pMethod->IsSharedByGenericInstantiations() && pMethod->IsInterface()) || pMT->IsValueType()))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsCanonicalMethodTable && HasInstantiation && IsInterface)))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || IsInterface))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsSharedByGenericInstantiations && IsInterface) || (count >= countChangeFrom && count <= countChangeTo)))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsInterface && HasInstantiation && IsCanonicalMethodTable) || (count >= countChangeFrom && count <= countChangeTo)))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsInterface && HasInstantiation)))
+    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsSharedByGenericInstantiations && IsInterface) || (count >= countChangeFrom && count <= countChangeTo)))
     {
+        takenCrossgenPath = true;
         if (pMethod->IsNDirect())
         {
             ownerType = pMethod->GetMethodTable_NoLogging();
@@ -1153,6 +1188,20 @@ BOOL ZapSig::EncodeMethod(
     {
         ownerType = pMethod->GetMethodTable_NoLogging();
     }
+
+    MethodTable* ownerMethodTable = ownerType.IsTypeDesc() ? NULL : ownerType.AsMethodTable();
+    const char* debugClassName = (ownerMethodTable == NULL) ? "**TypeDesc**" : ownerMethodTable->GetDebugClassName();
+    wprintf(L"[%c%c%c%c%c%c%c] method=%S, ownerType=%S (default %S)\n", 
+        takenCrossgenPath?L'X':L'-', 
+        IsSharedByGenericInstantiations ? L'S' : L'-',
+        IsInterface ? L'I' : L'-',
+        IsValueType ? L'V' : L'-',
+        HasInstantiation ? L'H' : L'-',
+        IsCanonicalMethodTable ? L'C' : L'-',
+        IsVtableMethod ? L'T' : L'-',
+        pMethod->m_pszDebugMethodName, 
+        debugClassName,
+        (ownerMethodTable == pMethod->GetMethodTable_NoLogging()) ? "the same" : pMethod->GetMethodTable_NoLogging()->GetDebugClassName());
 
     ZapSig::ExternalTokens externalTokens = ZapSig::NormalTokens;
     if (pfnDefineToken != NULL)
@@ -1198,7 +1247,20 @@ BOOL ZapSig::EncodeMethod(
 #ifdef FEATURE_READYTORUN_COMPILER
 
     // FUTURE: This condition should likely be changed or reevaluated once support for smaller version bubbles is implemented.
-    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble()))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (pMethod->IsSharedByGenericInstantiations() && pMethod->IsInterface()) || pMT->IsValueType()))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsCanonicalMethodTable && HasInstantiation && IsInterface)))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || IsInterface))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsSharedByGenericInstantiations && IsInterface) || (count >= countChangeFrom && count <= countChangeTo)))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsInterface && HasInstantiation && IsCanonicalMethodTable) || (count >= countChangeFrom && count <= countChangeTo)))
+//    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsInterface && HasInstantiation)))
+    if (IsReadyToRunCompilation())
+    {
+        if (pConstrainedResolvedToken != NULL)
+        {
+            methodFlags |= ENCODE_METHOD_SIG_Constrained;
+        } 
+    }
+    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble())) // || (IsSharedByGenericInstantiations && IsInterface) || (count >= countChangeFrom && count <= countChangeTo)))
     {
         if (pConstrainedResolvedToken != NULL)
         {

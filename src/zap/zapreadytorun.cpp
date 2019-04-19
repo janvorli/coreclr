@@ -257,6 +257,7 @@ void ZapImage::OutputEntrypointsTableForReadyToRun()
             resolvedToken.token = token;
             resolvedToken.hClass = pMethod->GetClassHandle();
             resolvedToken.hMethod = pMethod->GetHandle();
+            wprintf(L"ZapImage::OutputEntrypointsTableForReadyToRun       ");
             GetCompileInfo()->EncodeMethod(module, pMethod->GetHandle(), &sigBuilder, m_pImportTable, EncodeModuleHelper, &resolvedToken);
 
             DWORD cbBlob;
