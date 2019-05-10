@@ -263,6 +263,8 @@ BOOL ZapSig::GetSignatureForTypeHandle(TypeHandle      handle,
 
     if (fNeedsInstantiation)
     {
+        Module *pOrigModule = this->context.pInfoModule;
+        this->context.pInfoModule = pTypeHandleModule;
         pSigBuilder->AppendData(pMT->GetNumGenericArgs());
         Instantiation inst = pMT->GetInstantiation();
         for (DWORD i = 0; i < inst.GetNumArgs(); i++)
@@ -272,6 +274,7 @@ BOOL ZapSig::GetSignatureForTypeHandle(TypeHandle      handle,
             if (!this->GetSignatureForTypeHandle(t, pSigBuilder))
                 return FALSE;
         }
+        this->context.pInfoModule = pOrigModule;
     }
     return TRUE;
 }
@@ -1191,6 +1194,7 @@ BOOL ZapSig::EncodeMethod(
 
     MethodTable* ownerMethodTable = ownerType.IsTypeDesc() ? NULL : ownerType.AsMethodTable();
     const char* debugClassName = (ownerMethodTable == NULL) ? "**TypeDesc**" : ownerMethodTable->GetDebugClassName();
+    /*
     wprintf(L"[%c%c%c%c%c%c%c] method=%S, ownerType=%S (default %S)\n", 
         takenCrossgenPath?L'X':L'-', 
         IsSharedByGenericInstantiations ? L'S' : L'-',
@@ -1202,7 +1206,7 @@ BOOL ZapSig::EncodeMethod(
         pMethod->m_pszDebugMethodName, 
         debugClassName,
         (ownerMethodTable == pMethod->GetMethodTable_NoLogging()) ? "the same" : pMethod->GetMethodTable_NoLogging()->GetDebugClassName());
-
+    */
     ZapSig::ExternalTokens externalTokens = ZapSig::NormalTokens;
     if (pfnDefineToken != NULL)
     {
@@ -1246,6 +1250,14 @@ BOOL ZapSig::EncodeMethod(
 
 #ifdef FEATURE_READYTORUN_COMPILER
 
+    if (IsReadyToRunCompilation())
+    {
+        if (pConstrainedResolvedToken != NULL)
+        {
+            methodFlags |= ENCODE_METHOD_SIG_Constrained;
+        }
+    }
+
     // FUTURE: This condition should likely be changed or reevaluated once support for smaller version bubbles is implemented.
 //    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (pMethod->IsSharedByGenericInstantiations() && pMethod->IsInterface()) || pMT->IsValueType()))
 //    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsCanonicalMethodTable && HasInstantiation && IsInterface)))
@@ -1253,20 +1265,8 @@ BOOL ZapSig::EncodeMethod(
 //    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsSharedByGenericInstantiations && IsInterface) || (count >= countChangeFrom && count <= countChangeTo)))
 //    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsInterface && HasInstantiation && IsCanonicalMethodTable) || (count >= countChangeFrom && count <= countChangeTo)))
 //    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (IsInterface && HasInstantiation)))
-    if (IsReadyToRunCompilation())
+    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble() || (count >= countChangeFrom && count <= countChangeTo))) // || (IsSharedByGenericInstantiations && IsInterface) || (count >= countChangeFrom && count <= countChangeTo)))
     {
-        if (pConstrainedResolvedToken != NULL)
-        {
-            methodFlags |= ENCODE_METHOD_SIG_Constrained;
-        } 
-    }
-    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pMethod->GetModule()->IsInCurrentVersionBubble())) // || (IsSharedByGenericInstantiations && IsInterface) || (count >= countChangeFrom && count <= countChangeTo)))
-    {
-        if (pConstrainedResolvedToken != NULL)
-        {
-            methodFlags |= ENCODE_METHOD_SIG_Constrained;
-        }
-
         Module * pReferencingModule = pMethod->IsNDirect() ?
             pMethod->GetModule() :
             (Module *)pResolvedToken->tokenScope;
@@ -1373,7 +1373,7 @@ BOOL ZapSig::EncodeMethod(
         }
         else
         {
-            _ASSERTE(pInfoModule = pMethod->GetModule());
+            _ASSERTE(pInfoModule == pMethod->GetModule());
         }
 
         if (!ownerType.HasInstantiation())
@@ -1427,7 +1427,33 @@ BOOL ZapSig::EncodeMethod(
             if (*(BYTE*)pResolvedToken->pMethodSpec != (BYTE)IMAGE_CEE_CS_CALLCONV_GENERICINST)
                 ThrowHR(COR_E_BADIMAGEFORMAT);
 
-            pSigBuilder->AppendBlob((PVOID)(((BYTE*)pResolvedToken->pMethodSpec) + 1), pResolvedToken->cbMethodSpec - 1);
+            SigParser sigParser(pResolvedToken->pMethodSpec);
+            BYTE callingConvention;
+            IfFailThrow(sigParser.GetByte(&callingConvention));
+            if (callingConvention != (BYTE)IMAGE_CEE_CS_CALLCONV_GENERICINST)
+            {
+                ThrowHR(COR_E_BADIMAGEFORMAT);
+            }
+
+            ULONG numGenArgs;
+            IfFailThrow(sigParser.GetData(&numGenArgs));
+            pSigBuilder->AppendData(numGenArgs);
+
+            while (numGenArgs != 0)
+            {
+                if (IsReadyToRunCompilation() && pMethod->GetModule()->IsInCurrentVersionBubble() && pInfoModule != (Module *) pResolvedToken->tokenScope)
+                {
+                    pSigBuilder->AppendElementType((CorElementType)ELEMENT_TYPE_MODULE_ZAPSIG);
+                    DWORD index = (*((EncodeModuleCallback)pfnEncodeModule))(pEncodeModuleContext, (Module *) pResolvedToken->tokenScope);
+                    pSigBuilder->AppendData(index);
+                }
+
+                PCCOR_SIGNATURE typeSigStart = sigParser.GetPtr();
+                IfFailThrow(sigParser.SkipExactlyOne());
+                PCCOR_SIGNATURE typeSigEnd = sigParser.GetPtr();
+                pSigBuilder->AppendBlob((PVOID)typeSigStart, typeSigEnd - typeSigStart);
+                numGenArgs--;
+            }
         }
         else
         {
@@ -1454,6 +1480,14 @@ BOOL ZapSig::EncodeMethod(
         if (fEncodeUsingResolvedTokenSpecStreams && pConstrainedResolvedToken->pTypeSpec != NULL)
         {
             _ASSERTE(pConstrainedResolvedToken->cbTypeSpec > 0);
+
+            if (IsReadyToRunCompilation() && pMethod->GetModule()->IsInCurrentVersionBubble() && pInfoModule != (Module *) pConstrainedResolvedToken->tokenScope)
+            {
+                pSigBuilder->AppendElementType((CorElementType)ELEMENT_TYPE_MODULE_ZAPSIG);
+                DWORD index = (*((EncodeModuleCallback)pfnEncodeModule))(pEncodeModuleContext, (Module *) pConstrainedResolvedToken->tokenScope);
+                pSigBuilder->AppendData(index);
+            }
+
             pSigBuilder->AppendBlob((PVOID)pConstrainedResolvedToken->pTypeSpec, pConstrainedResolvedToken->cbTypeSpec);
         }
         else
@@ -1490,7 +1524,7 @@ void ZapSig::EncodeField(
     DWORD fieldFlags = ENCODE_FIELD_SIG_OwnerType;
 
 #ifdef FEATURE_READYTORUN_COMPILER
-    if (IsReadyToRunCompilation())
+    if (IsReadyToRunCompilation() && (!IsLargeVersionBubbleEnabled() || !pField->GetModule()->IsInCurrentVersionBubble()))
     {
         if (pResolvedToken == NULL)
         {

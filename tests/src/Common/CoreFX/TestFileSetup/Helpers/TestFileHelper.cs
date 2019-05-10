@@ -288,6 +288,8 @@ namespace CoreFX.TestUtils.TestFileSetup.Helpers
             // Get all archives in the directory
             string[] archives = Directory.GetFiles(archiveDirectory, "*.zip", SearchOption.TopDirectoryOnly);
 
+            string coreRootPath = @"f:\git\coreclr\bin\tests\Windows_NT.x64.Debug\Tests\Core_Root";
+
             foreach (string archivePath in archives)
             {
                 string destinationDirName = Path.Combine(destinationDirectory, Path.GetFileNameWithoutExtension(archivePath));
@@ -299,6 +301,37 @@ namespace CoreFX.TestUtils.TestFileSetup.Helpers
                 {
                     File.Delete(archivePath);
                 }
+
+                // Crossgen the main binary
+                string outDir = Path.Combine(destinationDirName, "Out");
+                Directory.CreateDirectory(outDir);
+                string testAssembly = Path.Combine(destinationDirName, Path.GetFileNameWithoutExtension(archivePath) + ".dll");
+                string outTestAssembly = Path.Combine(outDir, Path.GetFileNameWithoutExtension(archivePath) + ".dll");
+                string testhostPath = @"F:\git\coreclr\bin\tests\Windows_NT.x64.Debug\testhost\shared\Microsoft.NETCore.App\9.9.9";
+                Process crossgenProcess = new Process();
+                crossgenProcess.StartInfo.UseShellExecute = false;
+                crossgenProcess.StartInfo.FileName = $"{coreRootPath}\\crossgen.exe";
+                crossgenProcess.StartInfo.Arguments = $"/largeversionbubble /Platform_Assemblies_Paths \"{testhostPath};{outDir};{destinationDirName}\" /in {testAssembly} /out {outTestAssembly}";
+                crossgenProcess.StartInfo.CreateNoWindow = true;
+
+                Console.WriteLine("Running crossgen:");
+                Console.WriteLine(crossgenProcess.StartInfo.FileName + " " + crossgenProcess.StartInfo.Arguments);
+
+                if (crossgenProcess.Start())
+                {
+                    crossgenProcess.WaitForExit();
+                    if (crossgenProcess.ExitCode == 0)
+                    {
+                        File.Delete(testAssembly);
+                        File.Move(outTestAssembly, testAssembly);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Crossgen failed");
+                    }
+                }
+
+
             }
         }
 

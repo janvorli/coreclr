@@ -2180,8 +2180,9 @@ enum GetSignatureStringResults
 };
 
 GetSignatureStringResults GetMethodSignatureString (PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, DWORD_PTR dwModuleAddr, CQuickBytes *sigString);
-GetSignatureStringResults GetSignatureString (PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, DWORD_PTR dwModuleAddr, CQuickBytes *sigString);
+GetSignatureStringResults GetSignatureString (PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, DWORD_PTR dwModuleAddr, CQuickBytes *sigString, ULONG* pCb = NULL);
 void GetMethodName(mdMethodDef methodDef, IMetaDataImport * pImport, CQuickBytes *fullName);
+void GetMethodName(mdMethodDef methodDef, DWORD_PTR dwModuleAddr, CQuickBytes *fullName);
 
 #ifndef _TARGET_WIN64_
 #define     itoa_s_ptr _itoa_s

@@ -7835,6 +7835,10 @@ VOID    MethodTableBuilder::PlaceInstanceFields(MethodTable ** pByValueClassCach
 {
     STANDARD_VM_CONTRACT;
 
+    // if (strcmp(GetHalfBakedClass()->GetDebugClassName(), "TestDefaultTraceListener") == 0)
+    // {
+    //     DebugBreak();
+    // }
 
     DWORD i;
 

@@ -53,6 +53,7 @@ EXPORTS
     Dumpruntimetypes=DumpRuntimeTypes
     DumpSig
     dumpsig=DumpSig
+    dumpfixupblob=DumpFixupBlob
     DumpSigElem
     dumpsigelem=DumpSigElem
     DumpStack

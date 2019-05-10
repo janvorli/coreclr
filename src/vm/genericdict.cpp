@@ -1111,7 +1111,7 @@ Dictionary::PopulateEntry(
                     _ASSERTE((methodFlags & ENCODE_METHOD_SIG_Constrained) == ENCODE_METHOD_SIG_Constrained);
 
                     constraintType = ptr.GetTypeHandleThrowing(
-                        pZapSigContext->pInfoModule,
+                        pLookupModule, //pZapSigContext->pInfoModule,
                         &typeContext,
                         ClassLoader::LoadTypes,
                         CLASS_LOADED,

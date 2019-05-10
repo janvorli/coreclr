@@ -989,6 +989,489 @@ DECLARE_API(DumpIL)
     return Status;
 }
 
+class Signature
+{
+    DWORD_PTR m_remoteSigAddr;
+    COR_SIGNATURE* m_localSigAddr;
+    ULONG m_cbSig;
+    ULONG m_cbCur;
+    static const cbSigInc = 256;
+
+    bool FetchMoreData()
+    {
+        m_localSigAddr = (COR_SIGNATURE*)realloc(m_localSigAddr, m_cbSig + cbSigInc);
+        if (m_localSigAddr == NULL)
+        {
+            ReportOOM();
+            return false;
+        }
+
+        ULONG cbCopied;
+        if (!SafeReadMemory(TO_TADDR(m_remoteSigAddr + m_cbSig), m_localSigAddr + m_cbSig, cbSigInc, &cbCopied))
+        {
+            return false;
+        }
+
+        m_cbSig += cbCopied;
+
+        return true;
+    }
+
+public:
+    Signature(DWORD_PTR sigAddr) : m_remoteSigAddr(sigAddr), m_localSigAddr(NULL), m_cbSig(0), m_cbCur(0)
+    {
+    }
+
+    ~Signature()
+    {
+        free(m_localSigAddr);
+    }
+
+    bool ReadByte(COR_SIGNATURE* pDataOut)
+    {
+        if (m_cbCur >= m_cbSig)
+        {
+            if (!FetchMoreData())
+            {
+                return false;
+            }
+        }
+
+        *pDataOut = m_localSigAddr[m_cbCur++];
+        return true;
+    }
+
+    bool CorSigUncompressData(ULONG *pDataOut)
+    {
+        ULONG cb;
+        if (SUCCEEDED(::CorSigUncompressData(&m_localSigAddr[m_cbCur], m_cbSig - m_cbCur, pDataOut, &cb)))
+        {
+            m_cbCur += cb;
+            return true;
+        }
+
+        if (!FetchMoreData())
+        {
+            return false;
+        }
+
+        if (SUCCEEDED(::CorSigUncompressData(&m_localSigAddr[m_cbCur], m_cbSig - m_cbCur, pDataOut, &cb)))
+        {
+            m_cbCur += cb;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool GetSignatureString(DWORD_PTR dwModuleAddr, CQuickBytes *sigString)
+    {
+        GetSignatureStringResults result;
+
+        do
+        {
+            ULONG cb;
+            result = ::GetSignatureString(&m_localSigAddr[m_cbCur], m_cbSig - m_cbCur, dwModuleAddr, sigString, &cb);
+            if (result == GSS_SUCCESS)
+            {
+                m_cbCur += cb;
+                return true;
+            }
+
+            if (result == GSS_INSUFFICIENT_DATA)
+            {
+                if (!FetchMoreData())
+                {      
+                    return false;
+                }
+            }
+        }
+        while (result == GSS_INSUFFICIENT_DATA);
+
+        return false;
+    }
+};
+
+#define ENCODE_MODULE_OVERRIDE 0x80
+#define ENCODE_METHOD_HANDLE 0x11
+#define ENCODE_METHOD_SIG_OwnerType 0x40
+#define ENCODE_METHOD_SIG_SlotInsteadOfToken 0x08
+#define ENCODE_METHOD_SIG_MethodInstantiation 0x04
+#define ENCODE_METHOD_SIG_MemberRefToken 0x10
+#define ENCODE_DICTIONARY_LOOKUP_METHOD 0x09
+#define ENCODE_DICTIONARY_LOOKUP_TYPE 0x08
+#define ENCODE_DICTIONARY_LOOKUP_THISOBJ 0x07
+
+void DumpFixupBlobWorker(
+        DWORD_PTR dwSigAddr,
+        DWORD_PTR dwModuleAddr)
+{
+    Signature sig(dwSigAddr);
+    CQuickBytes sigString;
+
+    ULONG moduleId = 0;
+    
+    COR_SIGNATURE kind;
+    if (!sig.ReadByte(&kind))
+    {
+        return;
+    }
+    
+    switch (kind)
+    {
+        case ENCODE_DICTIONARY_LOOKUP_METHOD:
+            ExtOut("Lookup kind: ENCODE_DICTIONARY_LOOKUP_METHOD\n");
+            if (!sig.ReadByte(&kind))
+            {
+                return;
+            }
+            break;
+        case ENCODE_DICTIONARY_LOOKUP_TYPE:
+            ExtOut("Lookup kind: ENCODE_DICTIONARY_LOOKUP_TYPE\n");
+            if (!sig.ReadByte(&kind))
+            {
+                return;
+            }
+            break;
+        case ENCODE_DICTIONARY_LOOKUP_THISOBJ:
+            ExtOut("Lookup kind: ENCODE_DICTIONARY_LOOKUP_THISOBJ\n");
+            if (!sig.ReadByte(&kind))
+            {
+                return;
+            }
+            break;
+    }
+
+    if (kind & ENCODE_MODULE_OVERRIDE) 
+    {
+        kind &= ~ENCODE_MODULE_OVERRIDE;
+        if (!sig.CorSigUncompressData(&moduleId))
+        {
+            return;
+        }
+    }
+
+    switch (kind)
+    {
+        case ENCODE_METHOD_HANDLE:
+        {
+            ExtOut("Kind: ENCODE_METHOD_HANDLE\n");
+            ULONG methodFlags;
+            if (!sig.CorSigUncompressData(&methodFlags))
+            {
+                return;
+            }
+            ExtOut("Method flags: %x\n", methodFlags);
+
+            if (methodFlags & ENCODE_METHOD_SIG_OwnerType)
+            {
+                sigString.ReSize(0);
+                if (!sig.GetSignatureString(dwModuleAddr, &sigString))
+                {
+                    return;
+                }
+                ExtOut("Owner type: %S\n", (PCWSTR)sigString.Ptr());
+            }
+
+            if( methodFlags & ENCODE_METHOD_SIG_SlotInsteadOfToken )
+            {
+                ULONG methodSlot;
+                if (!sig.CorSigUncompressData(&methodSlot))
+                {
+                    return;
+                }
+                ExtOut("Method slot: %x\n", methodSlot);
+            }
+            else
+            {
+                ULONG methodRid;
+                if (!sig.CorSigUncompressData(&methodRid))
+                {
+                    return;
+                }
+                // TODO: mdl annotation / print as token?
+                mdMethodDef methodToken = ((methodFlags & ENCODE_METHOD_SIG_MemberRefToken) ? mdtMemberRef : mdtMethodDef) | methodRid;
+
+                sigString.ReSize(0);
+                GetMethodName(methodToken, dwModuleAddr, &sigString);
+
+                ExtOut("Method Rid: %x\n", methodRid);
+                ExtOut("Method signature: %S\n", (PCWSTR)sigString.Ptr());
+
+                if( methodFlags & ENCODE_METHOD_SIG_MethodInstantiation )
+                {
+                    ExtOut("Instatiation parameters: ");
+
+                    //for each generic arg, there is a type handle.
+                    ULONG numParams;
+                    if (!sig.CorSigUncompressData(&numParams))
+                    {
+                        return;
+                    }
+
+                    ExtOut("<");
+                    for( unsigned i = 0;i < numParams; ++i )
+                    {
+                        if( i != 0 )
+                            ExtOut(", ");
+
+                        sigString.ReSize(0);
+                        if (!sig.GetSignatureString(dwModuleAddr, &sigString))
+                        {
+                            return;
+                        }
+
+                        ExtOut("%S", (PCWSTR)sigString.Ptr());
+                    }
+                    ExtOut(">\n");
+                }
+
+                if (methodFlags & ENCODE_METHOD_SIG_MemberRefToken)
+                {
+                    // IfFailThrow(pMethodImport->GetMemberRefProps(methodToken,
+                    //     NULL,
+                    //     NULL,
+                    //     0,
+                    //     NULL,
+                    //     &pvSigBlob,
+                    //     &cbSigBlob));
+                }
+                else
+                {
+                    // IfFailThrow(pMethodImport->GetMethodProps(methodToken,
+                    //     NULL,
+                    //     NULL,
+                    //     0,
+                    //     NULL,
+                    //     NULL,
+                    //     &pvSigBlob,
+                    //     &cbSigBlob,
+                    //     NULL,
+                    //     NULL));
+                }
+            }
+
+        }
+        break;
+    }
+
+}
+
+void DumpFixupBlobWorker2(
+        DWORD_PTR dwSigAddr,
+        DWORD_PTR dwModuleAddr)
+{
+    ULONG cbSig = 0;
+    const ULONG cbSigInc = 256;
+    ArrayHolder<COR_SIGNATURE> pSig = new NOTHROW COR_SIGNATURE[cbSigInc];
+    if (pSig == NULL)
+    {
+        ReportOOM();        
+        return;
+    }
+
+    ULONG cbCopied;
+    if (!SafeReadMemory(TO_TADDR(dwSigAddr + cbSig), pSig + cbSig, cbSigInc, &cbCopied))
+        return;
+    cbSig += cbCopied;
+
+    CQuickBytes sigString;
+
+    ULONG cbCur = 0;
+    ULONG cb;
+    ULONG moduleId = 0;
+    
+    COR_SIGNATURE kind = pSig[cbCur++];
+    switch (kind)
+    {
+        case ENCODE_DICTIONARY_LOOKUP_METHOD:
+            ExtOut("Lookup kind: ENCODE_DICTIONARY_LOOKUP_METHOD\n");
+            kind = pSig[cbCur++];
+            break;
+        case ENCODE_DICTIONARY_LOOKUP_TYPE:
+            ExtOut("Lookup kind: ENCODE_DICTIONARY_LOOKUP_TYPE\n");
+            kind = pSig[cbCur++];
+            break;
+        case ENCODE_DICTIONARY_LOOKUP_THISOBJ:
+            ExtOut("Lookup kind: ENCODE_DICTIONARY_LOOKUP_THISOBJ\n");
+            kind = pSig[cbCur++];
+            break;
+    }
+
+    if (kind & ENCODE_MODULE_OVERRIDE) 
+    {
+        kind &= ~ENCODE_MODULE_OVERRIDE;
+        cb = CorSigUncompressData(&pSig[cbCur], &moduleId);
+        // if (cb>cbSigInc) 
+        //     goto ErrExit;
+        cbCur += cb;
+    }
+
+    switch (kind)
+    {
+        case ENCODE_METHOD_HANDLE:
+        {
+            ExtOut("Kind: ENCODE_METHOD_HANDLE\n");
+            ULONG methodFlags;
+            if (!SUCCEEDED(CorSigUncompressData(&pSig[cbCur], cbSig - cbCur, &methodFlags, &cb)))
+            {
+                pSig = (PCOR_SIGNATURE)realloc(pSig, cbSig + cbSigInc);
+                if (!SafeReadMemory(TO_TADDR(dwSigAddr + cbSig), pSig + cbSig, cbSigInc, &cbCopied))
+                    return;
+                cbSig += cbCopied;
+            }
+            cb = CorSigUncompressData(&pSig[cbCur], &methodFlags);
+            // if (cb>cbSigInc) 
+            //     goto ErrExit;
+            cbCur += cb;
+            ExtOut("Method flags: %x\n", methodFlags);
+
+            if (methodFlags & ENCODE_METHOD_SIG_OwnerType)
+            {
+                sigString.ReSize(0);
+                GetSignatureStringResults result = GetSignatureString(&pSig[cbCur], cbSig - cbCur, dwModuleAddr, &sigString, &cb);
+                if (result != GSS_SUCCESS)
+                {
+                    // TODO: handle not enough data
+                    return;
+                }
+                cbCur += cb;
+                ExtOut("Owner type: %S\n", (PCWSTR)sigString.Ptr());
+            }
+
+            if( methodFlags & ENCODE_METHOD_SIG_SlotInsteadOfToken )
+            {
+                ULONG methodSlot;
+                cb = CorSigUncompressData(&pSig[cbCur], &methodSlot);
+                // if (cb>cbSigInc) 
+                //     goto ErrExit;
+                cbCur += cb;
+                ExtOut("Method slot: %x\n", methodSlot);
+            }
+            else
+            {
+                ULONG methodRid;
+                cb = CorSigUncompressData(&pSig[cbCur], &methodRid);
+                // if (cb>cbSigInc) 
+                //     goto ErrExit;
+                cbCur += cb;
+                // TODO: mdl annotation / print as token?
+                mdMethodDef methodToken = ((methodFlags & ENCODE_METHOD_SIG_MemberRefToken) ? mdtMemberRef : mdtMethodDef) | methodRid;
+
+                sigString.ReSize(0);
+                GetMethodName(methodToken, MDImportForModule(dwModuleAddr), &sigString);
+
+                ExtOut("Method Rid: %x\n", methodRid);
+                ExtOut("Method signature: %S\n", (PCWSTR)sigString.Ptr());
+
+                if( methodFlags & ENCODE_METHOD_SIG_MethodInstantiation )
+                {
+                    ExtOut("Instatiation parameters: ");
+
+                    //for each generic arg, there is a type handle.
+                    ULONG numParams;
+                    cb = CorSigUncompressData(&pSig[cbCur], &numParams);
+                    // if (cb>cbSigInc) 
+                    //     goto ErrExit;
+                    cbCur += cb;
+
+                    ExtOut("<");
+                    for( unsigned i = 0;i < numParams; ++i )
+                    {
+                        if( i != 0 )
+                            ExtOut(", ");
+
+                        sigString.ReSize(0);
+                        GetSignatureStringResults result = GetSignatureString(&pSig[cbCur], cbSig - cbCur, dwModuleAddr, &sigString, &cb);
+                        if (result != GSS_SUCCESS)
+                        {
+                            // TODO: handle not enough data
+                            return;
+                        }
+                        cbCur += cb;
+                        ExtOut("%S", (PCWSTR)sigString.Ptr());
+                    }
+                    ExtOut(">\n");
+                }
+
+                if (methodFlags & ENCODE_METHOD_SIG_MemberRefToken)
+                {
+                    // IfFailThrow(pMethodImport->GetMemberRefProps(methodToken,
+                    //     NULL,
+                    //     NULL,
+                    //     0,
+                    //     NULL,
+                    //     &pvSigBlob,
+                    //     &cbSigBlob));
+                }
+                else
+                {
+                    // IfFailThrow(pMethodImport->GetMethodProps(methodToken,
+                    //     NULL,
+                    //     NULL,
+                    //     0,
+                    //     NULL,
+                    //     NULL,
+                    //     &pvSigBlob,
+                    //     &cbSigBlob,
+                    //     NULL,
+                    //     NULL));
+                }
+            }
+
+        }
+        break;
+    }
+
+}
+
+/**********************************************************************\
+* Routine Description:                                                 *
+*                                                                      *
+*    This function is called to dump a signature object.               *
+*                                                                      *
+\**********************************************************************/
+DECLARE_API(DumpFixupBlob)
+{
+    INIT_API();
+
+    MINIDUMP_NOT_SUPPORTED();
+    
+    //
+    // Fetch arguments
+    //
+
+    StringHolder sigExpr;
+    StringHolder moduleExpr;
+    CMDValue arg[] = 
+    {
+        {&sigExpr.data, COSTRING},
+        {&moduleExpr.data, COSTRING}
+    };
+    size_t nArg;
+    if (!GetCMDOption(args, NULL, 0, arg, _countof(arg), &nArg))
+    {
+        return Status;
+    }
+    if (nArg != 2)
+    {
+        ExtOut("!DumpFixupBlob <sigaddr> <moduleaddr>\n");
+        return Status;
+    }
+
+    DWORD_PTR dwSigAddr = GetExpression(sigExpr.data);        
+    DWORD_PTR dwModuleAddr = GetExpression(moduleExpr.data);
+
+    if (dwSigAddr == 0 || dwModuleAddr == 0)
+    {
+        ExtOut("Invalid parameters %s %s\n", sigExpr.data, moduleExpr.data);
+        return Status;
+    }
+    
+    DumpFixupBlobWorker(dwSigAddr, dwModuleAddr);
+    return Status;
+}
+
 void DumpSigWorker (
         DWORD_PTR dwSigAddr,
         DWORD_PTR dwModuleAddr,

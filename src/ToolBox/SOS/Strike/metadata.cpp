@@ -370,7 +370,7 @@ public:
 
     void GetMethodName(mdTypeDef token, CQuickBytes *fullName);
     GetSignatureStringResults GetMethodSignature(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, CQuickBytes *fullName);
-    GetSignatureStringResults GetSignature(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, CQuickBytes *fullName);
+    GetSignatureStringResults GetSignature(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, CQuickBytes *fullName, ULONG* pCb = NULL);
 
     LPCWSTR TypeDefName(mdTypeDef inTypeDef);
     LPCWSTR TypeRefName(mdTypeRef tr);
@@ -409,11 +409,11 @@ GetSignatureStringResults GetMethodSignatureString (PCCOR_SIGNATURE pbSigBlob, U
 }
 
 
-GetSignatureStringResults GetSignatureString (PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, DWORD_PTR dwModuleAddr, CQuickBytes *sigString)
+GetSignatureStringResults GetSignatureString (PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, DWORD_PTR dwModuleAddr, CQuickBytes *sigString, ULONG* pCb)
 {
     MDInfo mdInfo(dwModuleAddr);
 
-    return mdInfo.GetSignature(pbSigBlob, ulSigBlob, sigString);
+    return mdInfo.GetSignature(pbSigBlob, ulSigBlob, sigString, pCb);
 }
 
 void GetMethodName(mdMethodDef methodDef, IMetaDataImport * pImport, CQuickBytes *fullName)
@@ -423,6 +423,12 @@ void GetMethodName(mdMethodDef methodDef, IMetaDataImport * pImport, CQuickBytes
     mdInfo.GetMethodName(methodDef, fullName);
 }
 
+void GetMethodName(mdMethodDef methodDef, DWORD_PTR dwModuleAddr, CQuickBytes *fullName)
+{
+    MDInfo mdInfo(dwModuleAddr);
+
+    mdInfo.GetMethodName(methodDef, fullName);
+}
 
 // Tables for mapping element type to text
 const WCHAR *g_wszMapElementType[] = 
@@ -556,7 +562,7 @@ GetSignatureStringResults MDInfo::GetMethodSignature(PCCOR_SIGNATURE pbSigBlob, 
 }
 
 
-GetSignatureStringResults MDInfo::GetSignature(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, CQuickBytes *fullName)
+GetSignatureStringResults MDInfo::GetSignature(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, CQuickBytes *fullName, ULONG* pCb)
 {
     if (!m_pImport)
         return GSS_ERROR;
@@ -573,6 +579,11 @@ GetSignatureStringResults MDInfo::GetSignature(PCCOR_SIGNATURE pbSigBlob, ULONG 
             return GSS_INSUFFICIENT_DATA;
         else
             return GSS_ERROR;
+    }
+
+    if (pCb != NULL)
+    {
+        *pCb = cb;
     }
 
     return GSS_SUCCESS;
@@ -641,6 +652,15 @@ HRESULT MDInfo::GetFullNameForMD(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, LON
     }
     else 
     {
+        ULONG ulGenericArgs = 0;
+        if (ulData & IMAGE_CEE_CS_CALLCONV_GENERIC)
+        {
+            cb = CorSigUncompressData(&pbSigBlob[cbCur], &ulGenericArgs);
+            if (cb>ulSigBlob) 
+                goto ErrExit;
+            cbCur += cb;
+            ulSigBlob -= cb;
+        }
         cb = CorSigUncompressData(&pbSigBlob[cbCur], &ulArgs);
         if (cb>ulSigBlob) 
             goto ErrExit;
@@ -654,12 +674,31 @@ HRESULT MDInfo::GetFullNameForMD(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, LON
                 goto ErrExit;
             AddToSigBuffer (W(" "));
             AddToSigBuffer (m_szName);
-            AddToSigBuffer ( W("("));
             if (cb>ulSigBlob) 
                 goto ErrExit;
             cbCur += cb;
             ulSigBlob -= cb;
         }
+
+        if (ulGenericArgs != 0)
+        {
+            AddToSigBuffer ( W("<"));
+            for (ULONG j = 0; j < ulGenericArgs; j++)
+            {
+                AddToSigBuffer(W("!!"));
+                WCHAR szGenericArgNumber[10];
+                _itow_s((int)j, szGenericArgNumber, sizeof(szGenericArgNumber) / sizeof(szGenericArgNumber[0]), 10);
+
+                AddToSigBuffer(szGenericArgNumber);
+                if (j != ulGenericArgs - 1) 
+                {
+                    AddToSigBuffer ( W(","));
+                }
+            }
+            AddToSigBuffer ( W(">"));
+        }
+
+        AddToSigBuffer ( W("("));
 
         ULONG       i = 0;
         while (i < ulArgs && ulSigBlob > 0)
@@ -822,6 +861,21 @@ HRESULT MDInfo::GetOneElementType(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, UL
         goto ErrExit;
     }
 
+    if (ulData == ELEMENT_TYPE_MVAR)
+    {
+        IfFailGo(AddToSigBuffer(W("mvar #")));
+        ULONG genericArgNumber;
+        cb = CorSigUncompressData(&pbSigBlob[cbCur], &genericArgNumber);
+        cbCur += cb;
+
+        WCHAR szGenericArgNumber[10];
+        _itow_s((int)genericArgNumber, szGenericArgNumber, sizeof(szGenericArgNumber) / sizeof(szGenericArgNumber[0]), 10);
+
+        IfFailGo(AddToSigBuffer(szGenericArgNumber));
+
+        goto ErrExit;
+    }
+       
     // A generic instance, e.g. IEnumerable<String>
     if (ulData == ELEMENT_TYPE_GENERICINST)
     {
@@ -847,7 +901,7 @@ HRESULT MDInfo::GetOneElementType(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, UL
         IfFailGo(AddToSigBuffer(W(">")));
         goto ErrExit;
     }
-    
+
     // Past this point we must have something which directly maps to a value in g_wszMapElementType.
     IfFailGo(AddToSigBuffer(g_wszMapElementType[ulData]));
     if (CorIsPrimitiveType((CorElementType)ulData) || 
@@ -958,7 +1012,6 @@ HRESULT MDInfo::GetOneElementType(PCCOR_SIGNATURE pbSigBlob, ULONG ulSigBlob, UL
         goto ErrExit;
     }
 
-        
     if(ulData != ELEMENT_TYPE_ARRAY) return E_FAIL;
 
     // display the base type of SDARRAY
