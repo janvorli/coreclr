@@ -1538,7 +1538,33 @@ InjectActivationInternal(CPalThread* pThread)
     PAL_ERROR palError;
 
     mach_port_t threadPort = pThread->GetMachPortSelf();
-    kern_return_t MachRet = thread_suspend(threadPort);
+    kern_return_t MachRet;
+
+    while (true)
+    {
+        MachRet = thread_suspend(threadPort);
+        if (MachRet != KERN_SUCCESS)
+        {
+            break;
+        }
+
+        // Ensure that if the thread was running in the kernel, the kernel operation
+        // is safely aborted so that it can be restarted later.
+        MachRet = thread_abort_safely(threadPort);
+        if (MachRet == KERN_SUCCESS)
+        {
+            break;
+        }
+
+        // The thread was running in the kernel executing a non-atomic operation
+        // that cannot be restarted, so we need to resume the thread and retry
+        MachRet = thread_resume(threadPort);
+        if (MachRet != KERN_SUCCESS)
+        {
+            break;
+        }
+    }
+
     palError = (MachRet == KERN_SUCCESS) ? NO_ERROR : ERROR_GEN_FAILURE;
 
     if (palError == NO_ERROR)
