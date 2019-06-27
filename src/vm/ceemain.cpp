@@ -511,7 +511,7 @@ void InitGSCookie()
     GSCookie * pGSCookiePtr = GetProcessGSCookiePtr();
 
     DWORD oldProtection;
-    if(!ClrVirtualProtect((LPVOID)pGSCookiePtr, sizeof(GSCookie), PAGE_EXECUTE_READWRITE, &oldProtection))
+    if(!ClrVirtualProtect((LPVOID)pGSCookiePtr, sizeof(GSCookie), PAGE_READWRITE, &oldProtection))
     {
         ThrowLastError();
     }
@@ -541,7 +541,7 @@ void InitGSCookie()
         val ++;
     *pGSCookiePtr = val;
 
-    if(!ClrVirtualProtect((LPVOID)pGSCookiePtr, sizeof(GSCookie), oldProtection, &oldProtection))
+    if(!ClrVirtualProtect((LPVOID)pGSCookiePtr, sizeof(GSCookie), PAGE_READONLY, &oldProtection))
     {
         ThrowLastError();
     }

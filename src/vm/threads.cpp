@@ -1046,6 +1046,8 @@ DWORD_PTR Thread::OBJREF_HASH = OBJREF_TABSIZE;
 extern "C" void STDCALL JIT_PatchedCodeStart();
 extern "C" void STDCALL JIT_PatchedCodeLast();
 
+void* s_barrierCopy = NULL;
+
 //---------------------------------------------------------------------------
 // One-time initialization. Called during Dll initialization. So
 // be careful what you do in here!
@@ -1070,13 +1072,27 @@ void InitThreadManager()
     // We could reset it to non-writeable inbetween GCs and such, but then we'd have to keep on re-writing back and forth, 
     // so instead we'll leave it writable from here forward.
 
-    DWORD oldProt;
-    if (!ClrVirtualProtect((void *)JIT_PatchedCodeStart, (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart,
-                           PAGE_EXECUTE_READWRITE, &oldProt))
+//    DWORD oldProt;
+//    if (!ClrVirtualProtect((void *)JIT_PatchedCodeStart, (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart,
+//                           PAGE_EXECUTE_READWRITE, &oldProt))
+//    {
+//        _ASSERTE(!"ClrVirtualProtect of code page failed");
+//        COMPlusThrowWin32();
+//    }
+
+    
+    s_barrierCopy = ClrVirtualAlloc(NULL, 0x1000, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    if (s_barrierCopy == NULL)
     {
-        _ASSERTE(!"ClrVirtualProtect of code page failed");
+        _ASSERTE(!"ClrVirtualAlloc of GC barrier code page failed");
         COMPlusThrowWin32();
     }
+
+    memcpy(s_barrierCopy, (BYTE*)JIT_PatchedCodeStart, (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart);
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF, (BYTE*)s_barrierCopy + ((BYTE*)JIT_WriteBarrier - (BYTE*)JIT_PatchedCodeStart));
+//    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF, (BYTE*)s_barrierCopy + ((BYTE*)JIT_CheckedWriteBarrier - (BYTE*)JIT_PatchedCodeStart));
+//    SetJitHelperFunction(CORINFO_HELP_ASSIGN_BYREF, (BYTE*)s_barrierCopy + ((BYTE*)JIT_ByRefWriteBarrier - (BYTE*)JIT_PatchedCodeStart));
+
 
 #ifndef FEATURE_PAL
     _ASSERTE(GetThread() == NULL);
