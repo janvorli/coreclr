@@ -6711,6 +6711,9 @@ EXTERN_C void JIT_WriteBarrier_Debug_End();
 EXTERN_C void FCallMemcpy_End();
 #endif
 
+extern void* s_barrierCopy;
+extern "C" void STDCALL JIT_PatchedCodeStart();
+
 // Check if the passed in instruction pointer is in one of the
 // JIT helper functions.
 bool IsIPInMarkedJitHelper(UINT_PTR uControlPc)
@@ -6724,7 +6727,9 @@ bool IsIPInMarkedJitHelper(UINT_PTR uControlPc)
     CHECK_RANGE(JIT_MemSet)
     CHECK_RANGE(JIT_MemCpy)
 
-    CHECK_RANGE(JIT_WriteBarrier)
+    if (((BYTE*)s_barrierCopy + ((BYTE*)JIT_WriteBarrier - (BYTE*)JIT_PatchedCodeStart)) <= (void*)uControlPc && (void*)uControlPc < ((BYTE*)s_barrierCopy + ((BYTE*)JIT_WriteBarrier_End - (BYTE*)JIT_PatchedCodeStart))) return true;
+
+//    CHECK_RANGE(JIT_WriteBarrier)
     CHECK_RANGE(JIT_CheckedWriteBarrier)
     CHECK_RANGE(JIT_ByRefWriteBarrier)
 #else

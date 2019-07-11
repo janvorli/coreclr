@@ -5255,7 +5255,10 @@ BOOL HandleHardwareException(PAL_SEHException* ex)
                 // managed code that called the helper, otherwise the stack
                 // walker would skip all the managed frames upto the next
                 // explicit frame.
-                PAL_VirtualUnwind(ex->GetContextRecord(), NULL);
+                DWORD64 *sp = (DWORD64*)ex->GetContextRecord()->Rsp;
+                ex->GetContextRecord()->Rip = (DWORD64)*sp;
+                ex->GetContextRecord()->Rsp += 8;
+                //PAL_VirtualUnwind(ex->GetContextRecord(), NULL);
                 ex->GetExceptionRecord()->ExceptionAddress = (PVOID)GetIP(ex->GetContextRecord());
             }
 #ifdef VSD_STUB_CAN_THROW_AV
