@@ -920,6 +920,10 @@ static LPVOID VIRTUALReserveMemory(
     if (pRetVal == NULL)
     {
         // Try to reserve memory from the OS
+        if ((flProtect & 0xff) == PAGE_EXECUTE_READWRITE)
+        {
+             flAllocationType |= MEM_RESERVE_EXECUTABLE;
+        }
         pRetVal = ReserveVirtualMemory(pthrCurrent, (LPVOID)StartBoundary, MemSize, flAllocationType);
     }
 
