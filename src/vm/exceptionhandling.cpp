@@ -5177,9 +5177,24 @@ static BOOL IsIPinVirtualStub(PCODE f_IP)
 }
 #endif // VSD_STUB_CAN_THROW_AV
 
+extern void* s_barrierCopy;
+extern "C" void STDCALL JIT_PatchedCodeStart();
+extern "C" void STDCALL JIT_PatchedCodeLast();
+
+BOOL IsIPInWriteBarrierCodeCopy(PCODE controlPc)
+{
+    return (s_barrierCopy <= (void*)controlPc && (void*)controlPc < ((BYTE*)s_barrierCopy + ((BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart)));
+}
+
 BOOL IsSafeToHandleHardwareException(PCONTEXT contextRecord, PEXCEPTION_RECORD exceptionRecord)
 {
     PCODE controlPc = GetIP(contextRecord);
+    if (IsIPInWriteBarrierCodeCopy(controlPc))
+    {
+        // Pretend we were executing the barrier function at its original location so that the unwinder can unwind the frame
+        controlPc = (TADDR)JIT_PatchedCodeStart + (controlPc - (TADDR)s_barrierCopy);
+    }
+
     return g_fEEStarted && (
         exceptionRecord->ExceptionCode == STATUS_BREAKPOINT || 
         exceptionRecord->ExceptionCode == STATUS_SINGLE_STEP ||
@@ -5212,6 +5227,26 @@ static inline BOOL HandleArmSingleStep(PCONTEXT pContext, PEXCEPTION_RECORD pExc
     return FALSE;
 }
 #endif // _TARGET_ARM_
+
+/*
+// TODO: move this to excep%ARCH% (and name it AdjustContextForMarkedJitHelper)
+// TODO: fix AdjustContextForWriteBarrier to not to use VirtualUnwindToFirstManagedCallFrame
+// TODO: this may be a problem if the exception could have occured in the middle of the barrier code
+// TODO: or rather make this specific to the helpers that got copied
+// Idea: How about swapping the IP to be the static version of the barrier in case of the one copied away?
+//       This might be the cleanest - add AdjustIPOfBarrierCopy and leave the rest untouched.
+// Unwind from the first instruction of a helper
+void UnwindFromHelperFirstInstruction(CONTEXT* pContext)
+{
+#ifdef _TARGET_AMD64_ || _TARGET_X86_
+    TADDR *sp = (TADDR*)GetSP(pContext);
+    SetIP(pContext, *sp);
+    SetSP(pContext, (TADDR)(sp + 1));
+#elif defined(_TARGET_ARM_) || defined(_TARGET_ARM64_)
+    SetIP(pContext, GetLR(pContext));
+#endif
+}
+*/
 
 BOOL HandleHardwareException(PAL_SEHException* ex)
 {
@@ -5249,16 +5284,22 @@ BOOL HandleHardwareException(PAL_SEHException* ex)
         *((&fef)->GetGSCookiePtr()) = GetProcessGSCookie();
         {
             GCX_COOP();     // Must be cooperative to modify frame chain.
+
+            if (IsIPInWriteBarrierCodeCopy(controlPc))
+            {
+                // Pretend we were executing the barrier function at its original location so that the unwinder can unwind the frame
+                controlPc = (TADDR)JIT_PatchedCodeStart + (controlPc - (TADDR)s_barrierCopy);
+                SetIP(ex->GetContextRecord(), controlPc);
+            }
+
             if (IsIPInMarkedJitHelper(controlPc))
             {
                 // For JIT helpers, we need to set the frame to point to the
                 // managed code that called the helper, otherwise the stack
                 // walker would skip all the managed frames upto the next
                 // explicit frame.
-                DWORD64 *sp = (DWORD64*)ex->GetContextRecord()->Rsp;
-                ex->GetContextRecord()->Rip = (DWORD64)*sp;
-                ex->GetContextRecord()->Rsp += 8;
-                //PAL_VirtualUnwind(ex->GetContextRecord(), NULL);
+                PAL_VirtualUnwind(ex->GetContextRecord(), NULL);
+                //UnwindFromHelperFirstInstruction(ex->GetContextRecord());
                 ex->GetExceptionRecord()->ExceptionAddress = (PVOID)GetIP(ex->GetContextRecord());
             }
 #ifdef VSD_STUB_CAN_THROW_AV
