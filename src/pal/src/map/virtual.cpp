@@ -1012,11 +1012,6 @@ static LPVOID ReserveVirtualMemory(
     // so this should not consume too much swap space.
     int mmapFlags = MAP_ANON | MAP_PRIVATE;
 
-    if (StartBoundary != 0)
-    {
-        mmapFlags |= MAP_FIXED;
-    }
-
     if ((fAllocationType & MEM_LARGE_PAGES) != 0)
     {
 #if HAVE_MAP_HUGETLB

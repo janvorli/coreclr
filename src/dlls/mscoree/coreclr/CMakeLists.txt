@@ -53,6 +53,7 @@ else()
         set(EXPORTS_LINKER_OPTION -Wl,-exported_symbols_list,${EXPORTS_FILE})
 
         #add_compile_options(-segprot __COOKIE r r)
+
     endif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
 
 endif (WIN32)
@@ -67,8 +68,12 @@ add_library_clr(coreclr
 add_custom_target(coreclr_exports DEPENDS ${EXPORTS_FILE})
 add_dependencies(coreclr coreclr_exports)
 
-set_property(TARGET coreclr APPEND_STRING PROPERTY LINK_FLAGS "${EXPORTS_LINKER_OPTION} -segprot __COOKIE r r")
+set_property(TARGET coreclr APPEND_STRING PROPERTY LINK_FLAGS "${EXPORTS_LINKER_OPTION}")
 set_property(TARGET coreclr APPEND_STRING PROPERTY LINK_DEPENDS ${EXPORTS_FILE})
+
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    set_property(TARGET coreclr APPEND_STRING PROPERTY LINK_FLAGS "-segprot __COOKIE r r")
+endif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
 
 if (CLR_CMAKE_PLATFORM_UNIX)
     set(LIB_UNWINDER unwinder_wks)
