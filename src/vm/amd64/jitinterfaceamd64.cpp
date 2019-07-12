@@ -273,12 +273,17 @@ size_t WriteBarrierManager::GetCurrentWriteBarrierSize()
 extern "C" void STDCALL JIT_PatchedCodeStart();
 extern void* s_barrierCopy;
 
+PBYTE GetWriteBarrierCopyLocation()
+{
+    return (LPBYTE)s_barrierCopy + ((BYTE*)JIT_WriteBarrier - (BYTE*)JIT_PatchedCodeStart);
+}
+
 PBYTE WriteBarrierManager::CalculatePatchLocation(LPVOID base, LPVOID label, int offset)
 {
     // the label should always come after the entrypoint for this funtion
     _ASSERTE_ALL_BUILDS("clr/src/VM/AMD64/JITinterfaceAMD64.cpp", (LPBYTE)label > (LPBYTE)base);
 
-    return ((LPBYTE)s_barrierCopy + ((BYTE*)JIT_WriteBarrier - (BYTE*)JIT_PatchedCodeStart) + ((LPBYTE)GetEEFuncEntryPoint(label) - (LPBYTE)GetEEFuncEntryPoint(base) + offset));
+    return (GetWriteBarrierCopyLocation() + ((LPBYTE)GetEEFuncEntryPoint(label) - (LPBYTE)GetEEFuncEntryPoint(base) + offset));
 }
 
 
@@ -297,7 +302,7 @@ int WriteBarrierManager::ChangeWriteBarrierTo(WriteBarrierType newWriteBarrier, 
 
     // the memcpy must come before the switch statment because the asserts inside the switch 
     // are actually looking into the JIT_WriteBarrier buffer
-    memcpy((BYTE*)s_barrierCopy + ((BYTE*)JIT_WriteBarrier - (BYTE*)JIT_PatchedCodeStart), (LPVOID)GetCurrentWriteBarrierCode(), GetCurrentWriteBarrierSize());
+    memcpy(GetWriteBarrierCopyLocation(), (LPVOID)GetCurrentWriteBarrierCode(), GetCurrentWriteBarrierSize());
     
     switch (newWriteBarrier)
     {

@@ -720,7 +720,12 @@ typedef DPTR(GSCookie) PTR_GSCookie;
 // volatile is so that accesses to it do not get optimized away because of the const
 //
 
-extern "C" __attribute__((section("__COOKIE,__const"))) RAW_KEYWORD(volatile) const GSCookie s_gsCookie;
+extern "C" 
+#ifdef FEATURE_PAL
+// TODO: Linux version
+__attribute__((section("__COOKIE,__const")))
+#endif // FEATURE_PAL
+RAW_KEYWORD(volatile) const GSCookie s_gsCookie;
 
 inline
 GSCookie * GetProcessGSCookiePtr() { return  const_cast<GSCookie *>(&s_gsCookie); }

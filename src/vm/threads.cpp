@@ -1048,6 +1048,11 @@ extern "C" void STDCALL JIT_PatchedCodeLast();
 
 void* s_barrierCopy = NULL;
 
+BYTE* GetWriteBarrierCopyLocation(BYTE* barrier)
+{
+    return (BYTE*)s_barrierCopy + ((BYTE*)barrier - (BYTE*)JIT_PatchedCodeStart);
+}
+
 //---------------------------------------------------------------------------
 // One-time initialization. Called during Dll initialization. So
 // be careful what you do in here!
@@ -1066,22 +1071,7 @@ void InitThreadManager()
     // If you hit this assert on retail build, there is most likely problem with BBT script.
     _ASSERTE_ALL_BUILDS("clr/src/VM/threads.cpp", (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart < (ptrdiff_t)GetOsPageSize());
 
-    // I am using virtual protect to cover the entire range that this code falls in.
-    // 
-
-    // We could reset it to non-writeable inbetween GCs and such, but then we'd have to keep on re-writing back and forth, 
-    // so instead we'll leave it writable from here forward.
-
-//    DWORD oldProt;
-//    if (!ClrVirtualProtect((void *)JIT_PatchedCodeStart, (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart,
-//                           PAGE_EXECUTE_READWRITE, &oldProt))
-//    {
-//        _ASSERTE(!"ClrVirtualProtect of code page failed");
-//        COMPlusThrowWin32();
-//    }
-
-    
-    s_barrierCopy = ClrVirtualAlloc(NULL, 0x1000, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    s_barrierCopy = ClrVirtualAlloc(NULL, GetOsPageSize(), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if (s_barrierCopy == NULL)
     {
         _ASSERTE(!"ClrVirtualAlloc of GC barrier code page failed");
@@ -1089,10 +1079,31 @@ void InitThreadManager()
     }
 
     memcpy(s_barrierCopy, (BYTE*)JIT_PatchedCodeStart, (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart);
-    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF, (BYTE*)s_barrierCopy + ((BYTE*)JIT_WriteBarrier - (BYTE*)JIT_PatchedCodeStart));
-//    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF, (BYTE*)s_barrierCopy + ((BYTE*)JIT_CheckedWriteBarrier - (BYTE*)JIT_PatchedCodeStart));
-//    SetJitHelperFunction(CORINFO_HELP_ASSIGN_BYREF, (BYTE*)s_barrierCopy + ((BYTE*)JIT_ByRefWriteBarrier - (BYTE*)JIT_PatchedCodeStart));
 
+#ifdef _TARGET_X86_
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF_EAX, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrierEAX));
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF_EBX, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrierEBX));
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF_ECX, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrierECX));
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF_ESI, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrierESI));
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF_EDI, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrierEDI));
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF_EBP, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrierEBP));
+
+    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_EAX, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierEAX));
+    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_EBX, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierEBX));
+    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_ECX, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierECX));
+    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_ESI, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierESI));
+    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_EDI, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierEDI));
+    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_EBP, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierEBP));
+#else // _TARGET_X86_
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrier));
+#if defined(_TARGET_ARM_) || defined(_TARGET_ARM64_)
+    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrier));
+    SetJitHelperFunction(CORINFO_HELP_ASSIGN_BYREF, GetWriteBarrierCopyLocation((BYTE*)JIT_ByRefWriteBarrier));
+#endif // _TARGET_ARM_ || _TARGET_ARM64_
+#endif // _TARGET_X86_
+
+    // TODO: x86
+    // JIT_PatchedWriteBarrierGroup - need to handle that? Just make sure we update the address if it falls into the range or change the detection of the barrier
 
 #ifndef FEATURE_PAL
     _ASSERTE(GetThread() == NULL);

@@ -301,12 +301,6 @@ LOCAL_LABEL(wbs_highest_address):
 WRITE_BARRIER_END JIT_UpdateWriteBarrierState
 
 
-// ------------------------------------------------------------------
-// End of the writeable code region
-LEAF_ENTRY JIT_PatchedCodeLast, _TEXT
-    ret  lr
-LEAF_END JIT_PatchedCodeLast, _TEXT
-
 // void JIT_ByRefWriteBarrier
 // On entry:
 //   x13  : the source address (points to object reference to write)
@@ -473,6 +467,12 @@ LOCAL_LABEL(Exit):
     add  x14, x14, 8
     ret  lr  
 WRITE_BARRIER_END JIT_WriteBarrier
+
+// ------------------------------------------------------------------
+// End of the writeable code region
+LEAF_ENTRY JIT_PatchedCodeLast, _TEXT
+    ret  lr
+LEAF_END JIT_PatchedCodeLast, _TEXT
 
 #ifdef FEATURE_PREJIT
 //------------------------------------------------

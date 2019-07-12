@@ -4398,6 +4398,15 @@ static void DoEHLog(
 
 #ifdef FEATURE_PAL
 
+extern void* s_barrierCopy;
+extern "C" void STDCALL JIT_PatchedCodeStart();
+extern "C" void STDCALL JIT_PatchedCodeLast();
+
+BOOL IsIPInWriteBarrierCodeCopy(PCODE controlPc)
+{
+    return (s_barrierCopy <= (void*)controlPc && (void*)controlPc < ((BYTE*)s_barrierCopy + ((BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart)));
+}
+
 //---------------------------------------------------------------------------------------
 //
 // This functions performs an unwind procedure for a managed exception. The stack is unwound
@@ -4661,6 +4670,13 @@ VOID DECLSPEC_NORETURN UnwindManagedExceptionPass1(PAL_SEHException& ex, CONTEXT
         // Check whether we are crossing managed-to-native boundary
         while (!ExecutionManager::IsManagedCode(controlPc))
         {
+            if (IsIPInWriteBarrierCodeCopy(controlPc))
+            {
+                // Pretend we were executing the barrier function at its original location so that the unwinder can unwind the frame
+                controlPc = (UINT_PTR)JIT_PatchedCodeStart + (controlPc - (UINT_PTR)s_barrierCopy);
+                SetIP(frameContext, controlPc);
+            }
+
             UINT_PTR sp = GetSP(frameContext);
 
             BOOL success = PAL_VirtualUnwind(frameContext, NULL);
@@ -5177,21 +5193,12 @@ static BOOL IsIPinVirtualStub(PCODE f_IP)
 }
 #endif // VSD_STUB_CAN_THROW_AV
 
-extern void* s_barrierCopy;
-extern "C" void STDCALL JIT_PatchedCodeStart();
-extern "C" void STDCALL JIT_PatchedCodeLast();
-
-BOOL IsIPInWriteBarrierCodeCopy(PCODE controlPc)
-{
-    return (s_barrierCopy <= (void*)controlPc && (void*)controlPc < ((BYTE*)s_barrierCopy + ((BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart)));
-}
-
 BOOL IsSafeToHandleHardwareException(PCONTEXT contextRecord, PEXCEPTION_RECORD exceptionRecord)
 {
     PCODE controlPc = GetIP(contextRecord);
     if (IsIPInWriteBarrierCodeCopy(controlPc))
     {
-        // Pretend we were executing the barrier function at its original location so that the unwinder can unwind the frame
+        // Pretend we were executing the barrier function at its original location
         controlPc = (TADDR)JIT_PatchedCodeStart + (controlPc - (TADDR)s_barrierCopy);
     }
 

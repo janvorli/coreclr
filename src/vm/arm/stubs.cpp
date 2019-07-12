@@ -333,11 +333,17 @@ void ComputeWriteBarrierRange(BYTE ** ppbStart, DWORD * pcbLength)
     *pcbLength = size;
 }
 
+extern "C" void STDCALL JIT_PatchedCodeStart();
+extern void* s_barrierCopy;
+
 void CopyWriteBarrier(PCODE dstCode, PCODE srcCode, PCODE endCode)
 {
     TADDR dst = PCODEToPINSTR(dstCode);
     TADDR src = PCODEToPINSTR(srcCode);
     TADDR end = PCODEToPINSTR(endCode);
+
+    // compute the real location of the write barrier - their code was copied to an allocated memory 
+    dst = ((TADDR)s_barrierCopy + (dst - (TADDR)JIT_PatchedCodeStart);
 
     size_t size = (PBYTE)end - (PBYTE)src;
     memcpy((PVOID)dst, (PVOID)src, size);

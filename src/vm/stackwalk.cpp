@@ -750,6 +750,10 @@ PCODE Thread::VirtualUnwindNonLeafCallFrame(T_CONTEXT* pContext, KNONVOLATILE_CO
     return uControlPc;
 }
 
+BOOL IsIPInWriteBarrierCodeCopy(PCODE controlPc);
+extern "C" void STDCALL JIT_PatchedCodeStart();
+extern void* s_barrierCopy;
+
 // static
 UINT_PTR Thread::VirtualUnwindToFirstManagedCallFrame(T_CONTEXT* pContext)
 {
@@ -766,9 +770,17 @@ UINT_PTR Thread::VirtualUnwindToFirstManagedCallFrame(T_CONTEXT* pContext)
     // get our caller's PSP, or our caller's caller's SP.
     while (!ExecutionManager::IsManagedCode(uControlPc))
     {
+        if (IsIPInWriteBarrierCodeCopy(uControlPc))
+        {
+            // Pretend we were executing the barrier function at its original location so that the unwinder can unwind the frame
+            uControlPc = (PCODE)JIT_PatchedCodeStart + (uControlPc - (PCODE)s_barrierCopy);
+            SetIP(pContext, uControlPc);
+        }
+
 #ifndef FEATURE_PAL
         uControlPc = VirtualUnwindCallFrame(pContext);
 #else // !FEATURE_PAL
+
         BOOL success = PAL_VirtualUnwind(pContext, NULL);
         if (!success)
         {

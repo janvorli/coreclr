@@ -6746,6 +6746,10 @@ bool IsIPInMarkedJitHelper(UINT_PTR uControlPc)
 }
 #endif // WIN64EXCEPTIONS
 
+BOOL IsIPInWriteBarrierCodeCopy(PCODE controlPc);
+extern "C" void STDCALL JIT_PatchedCodeStart();
+extern void* s_barrierCopy;
+
 // Returns TRUE if caller should resume execution.
 BOOL
 AdjustContextForWriteBarrier(
@@ -6753,6 +6757,14 @@ AdjustContextForWriteBarrier(
         CONTEXT *pContext)
 {
     WRAPPER_NO_CONTRACT;
+
+    PCODE ip = GetIP(pContext);
+    if (IsIPInWriteBarrierCodeCopy(ip))
+    {
+        // Pretend we were executing the barrier function at its original location so that the unwinder can unwind the frame
+        ip = (PCODE)JIT_PatchedCodeStart + (ip - (PCODE)s_barrierCopy);
+        SetIP(pContext, ip);
+    }
 
 #ifdef FEATURE_DATABREAKPOINT
 
@@ -6764,7 +6776,6 @@ AdjustContextForWriteBarrier(
 
     if (pExceptionRecord == nullptr)
     {
-        PCODE ip = GetIP(pContext);
 #if defined(_TARGET_X86_)
         bool withinWriteBarrierGroup = ((ip >= (PCODE) JIT_WriteBarrierGroup) && (ip <= (PCODE) JIT_WriteBarrierGroup_End));
         bool withinPatchedWriteBarrierGroup = ((ip >= (PCODE) JIT_PatchedWriteBarrierGroup) && (ip <= (PCODE) JIT_PatchedWriteBarrierGroup_End));
@@ -6797,7 +6808,7 @@ AdjustContextForWriteBarrier(
 #endif // FEATURE_DATABREAKPOINT
 
 #if defined(_TARGET_X86_) && !defined(PLATFORM_UNIX)
-    void* f_IP = (void *)GetIP(pContext);
+    void* f_IP = (void *)ip;
 
     if (((f_IP >= (void *) JIT_WriteBarrierGroup) && (f_IP <= (void *) JIT_WriteBarrierGroup_End)) ||
         ((f_IP >= (void *) JIT_PatchedWriteBarrierGroup) && (f_IP <= (void *) JIT_PatchedWriteBarrierGroup_End)))
@@ -6812,7 +6823,7 @@ AdjustContextForWriteBarrier(
     }
     return FALSE;
 #elif defined(WIN64EXCEPTIONS) // _TARGET_X86_ && !PLATFORM_UNIX
-    void* f_IP = dac_cast<PTR_VOID>(GetIP(pContext));
+    void* f_IP = dac_cast<PTR_VOID>(ip);
 
     CONTEXT             tempContext;
     CONTEXT*            pExceptionContext = pContext;
