@@ -4396,16 +4396,11 @@ static void DoEHLog(
 }
 #endif // _DEBUG
 
-#ifdef FEATURE_PAL
-
 extern void* s_barrierCopy;
 extern "C" void STDCALL JIT_PatchedCodeStart();
 extern "C" void STDCALL JIT_PatchedCodeLast();
 
-BOOL IsIPInWriteBarrierCodeCopy(PCODE controlPc)
-{
-    return (s_barrierCopy <= (void*)controlPc && (void*)controlPc < ((BYTE*)s_barrierCopy + ((BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart)));
-}
+#ifdef FEATURE_PAL
 
 //---------------------------------------------------------------------------------------
 //

@@ -6752,4 +6752,6 @@ private:
 
 BOOL Debug_IsLockedViaThreadSuspension();
 
+BYTE* GetWriteBarrierCopyLocation(BYTE* barrier);
+
 #endif //__threads_h__

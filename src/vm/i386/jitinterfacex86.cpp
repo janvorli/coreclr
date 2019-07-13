@@ -99,6 +99,8 @@ extern "C" void STDCALL WriteBarrierAssert(BYTE* ptr, Object* obj)
 /* note that we can do almost as well in portable code, but this
    squezes the last little bit of perf out */
 
+void F_CALL_CONV JIT_Stelem_Ref(PtrArray* array, unsigned idx, Object* val);
+/*
 __declspec(naked) void F_CALL_CONV JIT_Stelem_Ref(PtrArray* array, unsigned idx, Object* val)
 {
     STATIC_CONTRACT_THROWS;
@@ -191,6 +193,7 @@ Epilog:
         ret     4
     }
 }
+*/
 
 extern "C" __declspec(naked) Object* F_CALL_CONV JIT_IsInstanceOfClass(MethodTable *pMT, Object *pObject)
 {
@@ -1164,6 +1167,8 @@ static const void * const c_rgDebugWriteBarriers[NUM_WRITE_BARRIERS] = {
 
 #define DEBUG_RANDOM_BARRIER_CHECK DbgGetEXETimeStamp() % 7 == 4
 
+BYTE* GetWriteBarrierCopyLocation(BYTE* barrier);
+
 /*********************************************************************/
 // Initialize the part of the JIT helpers that require very little of
 // EE infrastructure to be in place.
@@ -1282,7 +1287,7 @@ void InitJITHelpers1()
     {
         BYTE * pfunc = (BYTE *) JIT_WriteBarrierReg_PreGrow;
 
-        BYTE * pBuf = (BYTE *)c_rgWriteBarriers[iBarrier];
+        BYTE * pBuf = GetWriteBarrierCopyLocation((BYTE *)c_rgWriteBarriers[iBarrier]);
         int reg = c_rgWriteBarrierRegs[iBarrier];
 
         memcpy(pBuf, pfunc, 34);
@@ -1318,7 +1323,7 @@ void InitJITHelpers1()
         if ((g_pConfig->GetHeapVerifyLevel() & EEConfig::HEAPVERIFY_BARRIERCHECK) || DEBUG_RANDOM_BARRIER_CHECK) {
             pfunc = &pBuf[0];
             *pfunc++ = 0xE9;                // JMP c_rgDebugWriteBarriers[iBarrier]
-            *((DWORD*) pfunc) = (BYTE*) c_rgDebugWriteBarriers[iBarrier] - (pfunc + sizeof(DWORD));
+            *((DWORD*) pfunc) = GetWriteBarrierCopyLocation((BYTE*)c_rgDebugWriteBarriers[iBarrier]) - (pfunc + sizeof(DWORD));
         }
 #endif // WRITE_BARRIER_CHECK
     }
@@ -1363,7 +1368,7 @@ void ValidateWriteBarrierHelpers()
 #endif // WRITE_BARRIER_CHECK
     
     // first validate the PreGrow helper
-    BYTE* pWriteBarrierFunc = reinterpret_cast<BYTE*>(JIT_WriteBarrierEAX);
+    BYTE* pWriteBarrierFunc = GetWriteBarrierCopyLocation(reinterpret_cast<BYTE*>(JIT_WriteBarrierEAX));
 
     // ephemeral region
     DWORD* pLocation = reinterpret_cast<DWORD*>(&pWriteBarrierFunc[AnyGrow_EphemeralLowerBound]);
@@ -1401,7 +1406,7 @@ void ValidateWriteBarrierHelpers()
 #endif //CODECOVERAGE
 /*********************************************************************/
 
-#define WriteBarrierIsPreGrow() (((BYTE *)JIT_WriteBarrierEAX)[10] == 0xc1)
+#define WriteBarrierIsPreGrow() (GetWriteBarrierCopyLocation((BYTE *)JIT_WriteBarrierEAX)[10] == 0xc1)
 
 
 /*********************************************************************/
@@ -1419,14 +1424,14 @@ int StompWriteBarrierEphemeral(bool /* isRuntimeSuspended */)
 
 #ifdef WRITE_BARRIER_CHECK 
         // Don't do the fancy optimization if we are checking write barrier
-    if (((BYTE *)JIT_WriteBarrierEAX)[0] == 0xE9)  // we are using slow write barrier
+    if (GetWriteBarrierCopyLocation((BYTE *)JIT_WriteBarrierEAX)[0] == 0xE9)  // we are using slow write barrier
         return stompWBCompleteActions;
 #endif // WRITE_BARRIER_CHECK
 
     // Update the lower bound.
     for (int iBarrier = 0; iBarrier < NUM_WRITE_BARRIERS; iBarrier++)
     {
-        BYTE * pBuf = (BYTE *)c_rgWriteBarriers[iBarrier];
+        BYTE * pBuf = GetWriteBarrierCopyLocation((BYTE *)c_rgWriteBarriers[iBarrier]);
 
         // assert there is in fact a cmp r/m32, imm32 there
         _ASSERTE(pBuf[2] == 0x81);
@@ -1475,7 +1480,7 @@ int StompWriteBarrierResize(bool isRuntimeSuspended, bool bReqUpperBoundsCheck)
 
 #ifdef WRITE_BARRIER_CHECK 
         // Don't do the fancy optimization if we are checking write barrier
-    if (((BYTE *)JIT_WriteBarrierEAX)[0] == 0xE9)  // we are using slow write barrier
+    if ((GetWriteBarrierCopyLocation((BYTE *)JIT_WriteBarrierEAX))[0] == 0xE9)  // we are using slow write barrier
         return stompWBCompleteActions;
 #endif // WRITE_BARRIER_CHECK
 
@@ -1484,7 +1489,7 @@ int StompWriteBarrierResize(bool isRuntimeSuspended, bool bReqUpperBoundsCheck)
 
     for (int iBarrier = 0; iBarrier < NUM_WRITE_BARRIERS; iBarrier++)
     {
-        BYTE * pBuf = (BYTE *)c_rgWriteBarriers[iBarrier];
+        BYTE * pBuf = GetWriteBarrierCopyLocation((BYTE *)c_rgWriteBarriers[iBarrier]);
         int reg = c_rgWriteBarrierRegs[iBarrier];
 
         size_t *pfunc;

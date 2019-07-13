@@ -1248,6 +1248,8 @@ fremloopd:
 ; PatchedCodeStart and PatchedCodeEnd are used to determine bounds of patched code.
 ; 
 
+            ALIGN 4
+
 _JIT_PatchedCodeStart@0 proc public
 ret
 _JIT_PatchedCodeStart@0 endp
@@ -1278,6 +1280,104 @@ PatchedWriteBarrierHelper <ECX>
 PatchedWriteBarrierHelper <ESI>
 PatchedWriteBarrierHelper <EDI>
 PatchedWriteBarrierHelper <EBP>
+
+g_pObjectClass      equ     ?g_pObjectClass@@3PAVMethodTable@@A
+EXTERN  g_pObjectClass:dword
+EXTERN _ObjIsInstanceOfNoGC@8:proc
+EXTERN @ArrayStoreCheck@8:proc
+CORINFO_NullReferenceException EQU 0
+CORINFO_IndexOutOfRangeException EQU 3 
+OFFSETOF_MethodTable__m_ElementTypeHnd EQU 24h
+
+PUBLIC @JIT_Stelem_Ref@12
+@JIT_Stelem_Ref@12 PROC
+;__declspec(naked) void F_CALL_CONV JIT_Stelem_Ref(PtrArray* array, unsigned idx, Object* val)
+
+;    enum { CanCast = TypeHandle::CanCast,
+;         };
+
+        mov EAX, [ESP+4]            ; EAX = val
+
+        test ECX, ECX
+        je ThrowNullReferenceException
+
+        cmp EDX, [ECX+4];           ; test if in bounds
+        jae ThrowIndexOutOfRangeException
+
+        test EAX, EAX
+        jz Assigning0
+
+        push EDX
+        mov EDX, [ECX]
+        mov EDX, [EDX + OFFSETOF_MethodTable__m_ElementTypeHnd]
+
+        cmp EDX, [EAX]               ; do we have an exact match
+        jne NotExactMatch
+
+DoWrite2:
+        pop EDX
+        lea EDX, [ECX + 4*EDX + 8]
+        call _JIT_WriteBarrierEAX@0
+        ret     4
+
+Assigning0:
+        ; write barrier is not necessary for assignment of NULL references
+        mov     [ECX + 4*EDX + 8], EAX
+        ret     4
+
+DoWrite:
+        mov EAX, [ESP+4]            ; EAX = val
+        lea EDX, [ECX + 4*EDX + 8]
+        call _JIT_WriteBarrierEAX@0
+        ret     4
+
+NotExactMatch:
+        cmp EDX, [g_pObjectClass]   ; are we assigning to Array of objects
+        je DoWrite2
+
+        ; push EDX                 ; caller-save ECX and EDX
+        push ECX
+
+        push EDX                    ; element type handle
+        push EAX                    ; object
+
+        call _ObjIsInstanceOfNoGC@8
+
+        pop ECX                     ; caller-restore ECX and EDX
+        pop EDX
+
+        cmp EAX, 1; CanCast - add TypeHandle_CanCast constant
+        je DoWrite
+
+        ; Call the helper that knows how to erect a frame
+        push EDX
+        push ECX
+
+        lea ECX, [ESP+8+4]              ; ECX = address of object being stored
+        lea EDX, [ESP]                  ; EDX = address of array
+
+        call @ArrayStoreCheck@8
+
+        pop ECX                         ; these might have been updated!
+        pop EDX
+
+        cmp EAX, EAX                    ; set zero flag
+        jnz Epilog                      ; This jump never happens, it keeps the epilog walker happy
+
+        jmp DoWrite
+
+ThrowNullReferenceException:
+        mov ECX, CORINFO_NullReferenceException
+        jmp Throw
+
+ThrowIndexOutOfRangeException:
+        mov ECX, CORINFO_IndexOutOfRangeException
+
+Throw:
+        call    JIT_InternalThrowFromHelper
+Epilog:
+        ret     4
+@JIT_Stelem_Ref@12 ENDP
 
 PUBLIC _JIT_PatchedWriteBarrierGroup_End@0
 _JIT_PatchedWriteBarrierGroup_End@0 PROC

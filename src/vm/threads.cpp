@@ -1046,6 +1046,22 @@ DWORD_PTR Thread::OBJREF_HASH = OBJREF_TABSIZE;
 extern "C" void STDCALL JIT_PatchedCodeStart();
 extern "C" void STDCALL JIT_PatchedCodeLast();
 
+#ifdef _TARGET_X86_
+// TODO: include jitinterface.h??
+void STDCALL JIT_CheckedWriteBarrierEAX(); // JIThelp.asm/JIThelp.s
+void STDCALL JIT_CheckedWriteBarrierEBX(); // JIThelp.asm/JIThelp.s
+void STDCALL JIT_CheckedWriteBarrierECX(); // JIThelp.asm/JIThelp.s
+void STDCALL JIT_CheckedWriteBarrierESI(); // JIThelp.asm/JIThelp.s
+void STDCALL JIT_CheckedWriteBarrierEDI(); // JIThelp.asm/JIThelp.s
+void STDCALL JIT_CheckedWriteBarrierEBP(); // JIThelp.asm/JIThelp.s
+
+void STDCALL JIT_WriteBarrierEAX();        // JIThelp.asm/JIThelp.s
+void STDCALL JIT_WriteBarrierEBX();        // JIThelp.asm/JIThelp.s
+void STDCALL JIT_WriteBarrierECX();        // JIThelp.asm/JIThelp.s
+void STDCALL JIT_WriteBarrierESI();        // JIThelp.asm/JIThelp.s
+void STDCALL JIT_WriteBarrierEDI();        // JIThelp.asm/JIThelp.s
+void STDCALL JIT_WriteBarrierEBP();        // JIThelp.asm/JIThelp.s
+#endif _TARGET_X86_
 void* s_barrierCopy = NULL;
 
 BYTE* GetWriteBarrierCopyLocation(BYTE* barrier)
@@ -1071,7 +1087,7 @@ void InitThreadManager()
     // If you hit this assert on retail build, there is most likely problem with BBT script.
     _ASSERTE_ALL_BUILDS("clr/src/VM/threads.cpp", (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart < (ptrdiff_t)GetOsPageSize());
 
-    s_barrierCopy = ClrVirtualAlloc(NULL, GetOsPageSize(), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    s_barrierCopy = ClrVirtualAlloc(NULL, g_SystemInfo.dwAllocationGranularity, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if (s_barrierCopy == NULL)
     {
         _ASSERTE(!"ClrVirtualAlloc of GC barrier code page failed");
@@ -1088,12 +1104,14 @@ void InitThreadManager()
     SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF_EDI, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrierEDI));
     SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF_EBP, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrierEBP));
 
-    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_EAX, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierEAX));
-    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_EBX, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierEBX));
-    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_ECX, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierECX));
-    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_ESI, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierESI));
-    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_EDI, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierEDI));
-    SetJitHelperFunction(CORINFO_HELP_CHECKED_ASSIGN_REF_EBP, GetWriteBarrierCopyLocation((BYTE*)JIT_CheckedWriteBarrierEBP));
+    SetJitHelperFunction(CORINFO_HELP_ARRADDR_ST, GetWriteBarrierCopyLocation((BYTE*)JIT_Stelem_Ref));
+
+    int *callRel32 = (int*)(GetWriteBarrierCopyLocation((BYTE*)JIT_Stelem_Ref)+0x4b);
+    int delta = GetWriteBarrierCopyLocation((BYTE*)JIT_Stelem_Ref) - (BYTE*)JIT_Stelem_Ref;
+    *callRel32 -= delta;
+    callRel32 = (int*)(GetWriteBarrierCopyLocation((BYTE*)JIT_Stelem_Ref)+0x60);
+    *callRel32 -= delta;
+
 #else // _TARGET_X86_
     SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF, GetWriteBarrierCopyLocation((BYTE*)JIT_WriteBarrier));
 #if defined(_TARGET_ARM_) || defined(_TARGET_ARM64_)
