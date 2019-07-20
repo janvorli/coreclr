@@ -1099,6 +1099,7 @@ void InitThreadManager()
     memcpy(s_barrierCopy, (BYTE*)JIT_PatchedCodeStart, (BYTE*)JIT_PatchedCodeLast - (BYTE*)JIT_PatchedCodeStart);
 
     SetJitHelperFunction(CORINFO_HELP_ASSIGN_REF, GetWriteBarrierCodeLocation((void*)JIT_WriteBarrier));
+    SetJitHelperFunction(CORINFO_HELP_ARRADDR_ST, GetWriteBarrierCodeLocation((void*)JIT_Stelem_Ref));
 #else // FEATURE_WRITEBARRIER_COPY
 
     // I am using virtual protect to cover the entire range that this code falls in.
