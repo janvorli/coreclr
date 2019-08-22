@@ -454,6 +454,7 @@ static void sigsegv_handler(int code, siginfo_t *siginfo, void *context)
         if ((failureAddress - (sp - GetVirtualPageSize())) < 2 * GetVirtualPageSize())
         {
             (void)write(STDERR_FILENO, StackOverflowMessage, sizeof(StackOverflowMessage) - 1);
+            common_signal_handler(code, siginfo, context, 2, (size_t)0, (size_t)siginfo->si_addr);
             PROCAbort();
         }
 

@@ -2396,7 +2396,7 @@ CPalThread::EnsureSignalAlternateStack()
 
             // We include the size of the SignalHandlerWorkerReturnPoint in the alternate stack size since the
             // context contained in it is large and the SIGSTKSZ was not sufficient on ARM64 during testing.
-            int altStackSize = SIGSTKSZ + ALIGN_UP(sizeof(SignalHandlerWorkerReturnPoint), 16) + GetVirtualPageSize();
+            int altStackSize = SIGSTKSZ + ALIGN_UP(sizeof(SignalHandlerWorkerReturnPoint), 16) + GetVirtualPageSize() * 16;
 #ifdef HAS_ASAN
             // Asan also uses alternate stack so we increase its size on the SIGSTKSZ * 4 that enough for asan
             // (see kAltStackSize in compiler-rt/lib/sanitizer_common/sanitizer_posix_libcdep.cc)

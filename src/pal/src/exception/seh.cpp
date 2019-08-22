@@ -278,7 +278,8 @@ SEHProcessException(PAL_SEHException* exception)
                         // The exception happened in the page right below the stack limit,
                         // so it is a stack overflow
                         (void)write(STDERR_FILENO, StackOverflowMessage, sizeof(StackOverflowMessage) - 1);
-                        PROCAbort();
+                        //PROCAbort();
+                        exceptionRecord->ExceptionCode = EXCEPTION_STACK_OVERFLOW;
                     }
                 }
 

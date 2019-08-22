@@ -1229,7 +1229,7 @@ void GetCurrentExceptionPointers(PEXCEPTION_POINTERS pExceptionInfo)
 #ifdef _DEBUG
     if (pRecord != NULL)
     {
-        _ASSERTE ((PVOID)(pRecord) > (PVOID)(&pRecord));
+    //    _ASSERTE ((PVOID)(pRecord) > (PVOID)(&pRecord));
     }
 #endif
 }

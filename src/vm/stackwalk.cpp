@@ -2577,9 +2577,9 @@ StackWalkAction StackFrameIterator::NextRaw(void)
 
         PTR_VOID newSP = PTR_VOID((TADDR)GetRegdisplaySP(m_crawl.pRD));
 #ifndef NO_FIXED_STACK_LIMIT
-        FAIL_IF_SPECULATIVE_WALK(newSP >= m_crawl.pThread->GetCachedStackLimit());
+        //FAIL_IF_SPECULATIVE_WALK(newSP >= m_crawl.pThread->GetCachedStackLimit());
 #endif // !NO_FIXED_STACK_LIMIT
-        FAIL_IF_SPECULATIVE_WALK(newSP < m_crawl.pThread->GetCachedStackBase());
+        //FAIL_IF_SPECULATIVE_WALK(newSP < m_crawl.pThread->GetCachedStackBase());
 
 #undef FAIL_IF_SPECULATIVE_WALK
 

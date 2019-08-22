@@ -1057,6 +1057,7 @@ void DECLSPEC_NORETURN EEPolicy::HandleFatalStackOverflow(EXCEPTION_POINTERS *pE
     STRESS_LOG0(LF_EH, LL_INFO100, "In EEPolicy::HandleFatalStackOverflow\n");
 
     DisplayStackOverflowException();
+    LogCallstackForLogWorker();
 
     if(ETW_EVENT_ENABLED(MICROSOFT_WINDOWS_DOTNETRUNTIME_PRIVATE_PROVIDER_DOTNET_Context, FailFast))
     {
@@ -1121,6 +1122,9 @@ void DECLSPEC_NORETURN EEPolicy::HandleFatalStackOverflow(EXCEPTION_POINTERS *pE
 
         WatsonLastChance(pThread, pExceptionInfo, 
             (fTreatAsNativeUnhandledException == FALSE)? TypeOfReportedError::UnhandledException: TypeOfReportedError::NativeThreadUnhandledException);
+    
+        DefaultCatchHandler(pExceptionInfo /*pExceptionInfo*/, NULL /*Throwable*/, TRUE /*useLastThrownObject*/,
+            TRUE /*isTerminating*/, FALSE /*isThreadBaseFIlter*/, FALSE /*sendAppDomainEvents*/);
     }
 
     TerminateProcess(GetCurrentProcess(), COR_E_STACKOVERFLOW);
