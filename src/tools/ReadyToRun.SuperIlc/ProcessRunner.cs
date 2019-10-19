@@ -258,7 +258,7 @@ public class ProcessRunner : IDisposable
         TextWriter logWriter = _logWriter;
         if (!string.IsNullOrEmpty(data) && logWriter != null)
         {
-            lock (logWriter)
+            if (_logWriter != null)
             {
                 if (_logWriter != null)
                 {

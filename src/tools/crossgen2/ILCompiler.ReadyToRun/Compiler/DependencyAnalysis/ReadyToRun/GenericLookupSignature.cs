@@ -67,6 +67,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             else if (_typeArgument != null)
             {
                 targetModule = _signatureContext.GetTargetModule(_typeArgument);
+                //targetModule = _signatureContext.GetTargetModule(_methodContext.ContextType);
             }
             else if (_fieldArgument != null)
             {

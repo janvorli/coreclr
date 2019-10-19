@@ -190,6 +190,10 @@ namespace ReadyToRun.SuperIlc
         public virtual ProcessParameters AppExecutionProcess(string outputRoot, string appPath, IEnumerable<string> modules, IEnumerable<string> folders)
         {
             string exeToRun = GetOutputFileName(outputRoot, appPath);
+            if (exeToRun.Contains("DllImportPath_ExeFile.exe"))
+            {
+                int a = 5;
+            }
             ProcessParameters processParameters = ExecutionProcess(modules, folders, _options.NoEtw);
             processParameters.ProcessPath = _options.CoreRunPath(Index, isFramework: false);
             processParameters.Arguments = exeToRun;

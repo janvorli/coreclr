@@ -47,7 +47,7 @@ namespace ReadyToRun.SuperIlc
 
             // TODO: additional framework build failures
             new FrameworkExclusion("Microsoft.Diagnostics.Tracing.TraceEvent", "Assert failure in JIT", crossgen2Only: true),
-            new FrameworkExclusion("System.Private.CoreLib", "Assert failure in JIT", crossgen2Only: true),
+            //new FrameworkExclusion("System.Private.CoreLib", "Assert failure in JIT", crossgen2Only: true),
         };
 
         private readonly IEnumerable<BuildFolder> _buildFolders;

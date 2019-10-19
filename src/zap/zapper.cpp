@@ -1147,7 +1147,7 @@ void Zapper::InitializeCompilerFlags(CORCOMPILE_VERSION_INFO * pVersionInfo)
     if (pVersionInfo->wCodegenFlags & CORCOMPILE_CODEGEN_DEBUGGING)
     {
         m_pOpt->m_compilerFlags.Set(CORJIT_FLAGS::CORJIT_FLAG_DEBUG_INFO);
-        m_pOpt->m_compilerFlags.Set(CORJIT_FLAGS::CORJIT_FLAG_DEBUG_CODE);
+//        m_pOpt->m_compilerFlags.Set(CORJIT_FLAGS::CORJIT_FLAG_DEBUG_CODE);
     }
 
     if (pVersionInfo->wCodegenFlags & CORCOMPILE_CODEGEN_PROFILING)
