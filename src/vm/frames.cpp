@@ -400,6 +400,55 @@ VOID Frame::Push(Thread *pThread)
     
     m_Next = pThread->GetFrame();
 
+    if (m_Next != FRAME_TOP && m_Next->GetVTablePtr() == GCFrame::GetMethodFrameVPtr())
+    {
+        bool isKnownFrame =
+            GetVTablePtr() == GCFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == DebuggerClassInitMarkFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == DebuggerU2MCatchHandlerFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == PrestubMethodFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == StubDispatchFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == DebuggerExitFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == FaultingExceptionFrame::GetMethodFrameVPtr() ||
+#ifdef FEATURE_COMINTEROP
+            GetVTablePtr() == ComPlusMethodFrame::GetMethodFrameVPtr() ||
+#endif
+#ifdef FEATURE_HIJACK            
+            GetVTablePtr() == RedirectedThreadFrame::GetMethodFrameVPtr() ||
+#endif
+#ifdef FEATURE_READYTORUN
+            GetVTablePtr() == ExternalMethodFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == DynamicHelperFrame::GetMethodFrameVPtr() ||
+#endif        
+            // These are ok
+            GetVTablePtr() == HelperMethodFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == ProtectValueClassFrame::GetMethodFrameVPtr() ||
+            GetVTablePtr() == HelperMethodFrame_1OBJ::GetMethodFrameVPtr() ||
+            GetVTablePtr() == HelperMethodFrame_2OBJ::GetMethodFrameVPtr() ||
+            GetVTablePtr() == HelperMethodFrame_3OBJ::GetMethodFrameVPtr() ||
+#ifdef FEATURE_COMINTEROP
+            GetVTablePtr() == ComPrestubMethodFrame::GetMethodFrameVPtr() ||
+#endif
+            GetVTablePtr() == HelperMethodFrame_PROTECTOBJ::GetMethodFrameVPtr();
+
+        if (!isKnownFrame)
+        {
+            const char* frameTypeName = GetFrameTypeName();
+            if (frameTypeName == NULL)
+            {
+                frameTypeName = GetFrameTypeName(GetVTablePtr());
+                if (frameTypeName == NULL)
+                {
+                    frameTypeName = "[Unknown]";
+                }
+            }
+
+            printf("Pushing frame %s on top of GCFrame\n", frameTypeName);
+        }
+
+        _ASSERTE(isKnownFrame);
+    }
+
     // GetOsPageSize() is used to relax the assert for cases where two Frames are
     // declared in the same source function. We cannot predict the order
     // in which the C compiler will lay them out in the stack frame.
@@ -459,14 +508,14 @@ VOID Frame::Pop(Thread *pThread)
     m_Next = NULL;
 }
 
-#if defined(FEATURE_PAL) && !defined(DACCESS_COMPILE) && !defined(CROSSGEN_COMPILE)
+#if !defined(DACCESS_COMPILE) && !defined(CROSSGEN_COMPILE)
 void Frame::PopIfChained()
 {      
     CONTRACTL
     {
         NOTHROW;
         GC_NOTRIGGER;
-        MODE_COOPERATIVE;
+        MODE_ANY;
     }
     CONTRACTL_END;
 
@@ -1081,25 +1130,6 @@ GCFrame::~GCFrame()
         {
             m_pCurThread->EnablePreemptiveGC();
         }
-    }
-}
-
-ExceptionFilterFrame::~ExceptionFilterFrame()
-{
-    CONTRACTL
-    {
-        NOTHROW;
-        GC_NOTRIGGER;
-        MODE_ANY;
-    }
-    CONTRACTL_END;
-
-    if (m_Next != NULL)
-    {
-        GCX_COOP();
-        // When the frame is destroyed, make sure it is no longer in the
-        // frame chain managed by the Thread.
-        Pop();
     }
 }
 

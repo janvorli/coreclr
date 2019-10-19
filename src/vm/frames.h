@@ -791,11 +791,12 @@ protected:
         LIMITED_METHOD_CONTRACT;
     }
 
-#if defined(FEATURE_PAL) && !defined(DACCESS_COMPILE) && !defined(CROSSGEN_COMPILE)
+#if !defined(DACCESS_COMPILE) && !defined(CROSSGEN_COMPILE)
+#ifdef FEATURE_PAL
     virtual ~Frame() { LIMITED_METHOD_CONTRACT; }
-
+#endif // FEATURE_PAL
     void PopIfChained();
-#endif // FEATURE_PAL && !DACCESS_COMPILE && !CROSSGEN_COMPILE
+#endif // !DACCESS_COMPILE && !CROSSGEN_COMPILE
 };
 
 
@@ -2692,7 +2693,15 @@ public:
         WRAPPER_NO_CONTRACT;
         Push();
     };
-#endif
+
+#if !defined(FEATURE_PAL) && !defined(CROSSGEN_COMPILE)
+    ~DebuggerClassInitMarkFrame()
+    {
+        PopIfChained();
+    }
+#endif // !FEATURE_PAL && !CROSSGEN_COMPILE
+
+#endif // DACCESS_COMPILE
 
     virtual int GetFrameType()
     {
@@ -3267,10 +3276,13 @@ public:
     }
 
 #ifndef CROSSGEN_COMPILE
-    ~ExceptionFilterFrame();
-#endif
+    ~ExceptionFilterFrame()
+    {
+        PopIfChained();
+    }
+#endif // !CROSSGEN_COMPILE
 
-#endif
+#endif // DACCESS_COMPILE
 
 private:
     // Keep as last entry in class
