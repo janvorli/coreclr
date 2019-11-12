@@ -624,16 +624,18 @@ bool GCToOSInterface::VirtualCommit(void* address, size_t size, uint16_t node)
     {
         if ((int)node <= g_highestNumaNode)
         {
+            static const int BitsPerUnsignedLong = 8 * sizeof(unsigned long);
             int usedNodeMaskBits = g_highestNumaNode + 1;
-            int nodeMaskLength = (usedNodeMaskBits + sizeof(unsigned long) - 1) / sizeof(unsigned long);
+            int nodeMaskLength = (usedNodeMaskBits + BitsPerUnsignedLong - 1) / BitsPerUnsignedLong;
             unsigned long nodeMask[nodeMaskLength];
             memset(nodeMask, 0, sizeof(nodeMask));
 
-            int index = node / sizeof(unsigned long);
-            nodeMask[index] = ((unsigned long)1) << (node & (sizeof(unsigned long) - 1));
+            int index = node / BitsPerUnsignedLong;
+            nodeMask[index] = ((unsigned long)1) << (node & (BitsPerUnsignedLong - 1));
 
-            int st = mbind(address, size, MPOL_PREFERRED, nodeMask, usedNodeMaskBits, 0);
-            assert(st == 0);
+            int st = mbind(result, dwSize, MPOL_PREFERRED, nodeMask, usedNodeMaskBits, 0);
+
+            _ASSERTE(st == 0);
             // If the mbind fails, we still return the allocated memory since the node is just a hint
         }
     }
