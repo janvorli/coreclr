@@ -1014,6 +1014,7 @@ void LCGMethodResolver::Destroy()
 
     if (m_managedResolver)
     {
+        STRESS_LOG2(LF_CLASSLOADER, LL_INFO1000, "LCGMethodResolver::Destroy for resolver %p destroying handle %p\n", this, (void*)m_managedResolver);
         ::DestroyLongWeakHandle(m_managedResolver);
         m_managedResolver = NULL;
     }

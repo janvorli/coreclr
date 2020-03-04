@@ -246,6 +246,12 @@ uint32_t HndGetHandleTableIndex(HHANDLETABLE hTable)
 }
 
 #ifndef DACCESS_COMPILE
+
+#if !defined(BUILD_AS_STANDALONE) && defined(FEATURE_CORECLR)
+void HandleTestCreateHandle(OBJECTHANDLE handle, void* returnAddress);
+void HandleTestDestroyHandle(OBJECTHANDLE handle, void* returnAddress);
+#endif
+
 /*
  * HndCreateHandle
  *
@@ -313,7 +319,9 @@ OBJECTHANDLE HndCreateHandle(HHANDLETABLE hTable, uint32_t uType, OBJECTREF obje
     // store the reference
     HndAssignHandle(handle, object);
     STRESS_LOG2(LF_GC, LL_INFO1000, "CreateHandle: %p, type=%d\n", handle, uType);
-
+#if !defined(BUILD_AS_STANDALONE) && defined(FEATURE_CORECLR)
+    HandleTestCreateHandle(handle, (void*)_ReturnAddress());
+#endif
     // return the result
     return handle;
 }
@@ -365,6 +373,9 @@ void HndDestroyHandle(HHANDLETABLE hTable, uint32_t uType, OBJECTHANDLE handle)
     CONTRACTL_END;
 
     STRESS_LOG2(LF_GC, LL_INFO1000, "DestroyHandle: *%p->%p\n", handle, *(_UNCHECKED_OBJECTREF *)handle);
+#if !defined(BUILD_AS_STANDALONE) && defined(FEATURE_CORECLR)
+    HandleTestDestroyHandle(handle, (void*)_ReturnAddress());
+#endif
 
     FIRE_EVENT(DestroyGCHandle, (void *)handle);
     FIRE_EVENT(PrvDestroyGCHandle, (void *)handle);

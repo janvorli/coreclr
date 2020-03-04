@@ -1102,6 +1102,7 @@ PVOID QCALLTYPE RuntimeTypeHandle::GetGCHandle(QCall::TypeHandle pTypeHandle, IN
     TypeHandle th = pTypeHandle.AsTypeHandle();
     assert(handleType >= HNDTYPE_WEAK_SHORT && handleType <= HNDTYPE_WEAK_WINRT);
     objHandle = AppDomain::GetCurrentDomain()->CreateTypedHandle(NULL, static_cast<HandleType>(handleType));
+    STRESS_LOG3(LF_CLASSLOADER, LL_INFO1000, "RuntimeTypeHandle::GetGCHandle for allocator %p adding handle %p called from %p\n", th.GetLoaderAllocator(), (void*)objHandle, _ReturnAddress());
     th.GetLoaderAllocator()->RegisterHandleForCleanup(objHandle);
 
     END_QCALL;

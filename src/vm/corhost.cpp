@@ -943,6 +943,68 @@ HRESULT CorHost2::RegisterMacEHPort()
     return S_OK;
 }
 
+
+#if !defined(DACCESS_COMPILE)
+// && !defined(FEATURE_STANDALONE_GC) && defined(FEATURE_CORECLR)
+
+template <typename PARENT>
+class RemoveSHashTraits : public PARENT
+{
+public:
+    // explicitly declare local typedefs for these traits types, otherwise 
+    // the compiler may get confused
+    typedef typename PARENT::element_t element_t;
+    typedef typename PARENT::count_t count_t;
+
+    static const bool s_supports_remove = true;
+//    static element_t Deleted() { UNREACHABLE(); }
+//    static bool IsDeleted(const element_t &e) { LIMITED_METHOD_DAC_CONTRACT; return false; }
+};
+
+template <typename ELEMENT, typename TRAITS = RemoveSHashTraits< SetSHashTraits <ELEMENT> > >
+class SetSHash2 : public SHash< TRAITS >
+{
+    typedef SHash<TRAITS> PARENT;
+
+public:
+    BOOL Contains(ELEMENT key) const
+    {
+        return PARENT::LookupPtr(key) != NULL;
+    }
+};
+
+SetSHash2<OBJECTHANDLE> g_usedHandles;
+SpinLock g_usedHandlesLock;
+
+void HandleTestCreateHandle(OBJECTHANDLE handle, void* returnAddress)
+{
+    SpinLockHolder holder(&g_usedHandlesLock);    
+    if (!g_usedHandles.Contains(handle))
+    {
+        STRESS_LOG2(LF_CLASSLOADER, LL_INFO1000, "Allocation of handle %p called from %p\n", (void*)handle, returnAddress);
+        g_usedHandles.Add(handle);
+        return;
+    }
+    STRESS_LOG2(LF_CLASSLOADER, LL_INFO1000, "Double-allocation of handle %p called from %p\n", (void*)handle, returnAddress);
+    EEPOLICY_HANDLE_FATAL_ERROR_WITH_MESSAGE(COR_E_FAILFAST, W("Double-allocation of a handle"));
+}
+
+void HandleTestDestroyHandle(OBJECTHANDLE handle, void* returnAddress)
+{
+    {
+        SpinLockHolder holder(&g_usedHandlesLock);    
+        if (g_usedHandles.Contains(handle))
+        {
+            STRESS_LOG2(LF_CLASSLOADER, LL_INFO1000, "HandleTestDestroyHandle of handle %p called from %p\n", (void*)handle, returnAddress);
+            g_usedHandles.Remove(handle);
+            return;
+        }
+    }
+    STRESS_LOG2(LF_CLASSLOADER, LL_INFO1000, "Double-destroy of handle %p called from %p\n", (void*)handle, returnAddress);
+    EEPOLICY_HANDLE_FATAL_ERROR_WITH_MESSAGE(COR_E_FAILFAST, W("Double-destroy of a handle"));
+}
+#endif
+
 HRESULT CorHost2::SetStartupFlags(STARTUP_FLAGS flag)
 {
     CONTRACTL
@@ -959,6 +1021,10 @@ HRESULT CorHost2::SetStartupFlags(STARTUP_FLAGS flag)
     }
 
     m_dwStartupFlags = flag;
+
+#if !defined(DACCESS_COMPILE)// && !defined(FEATURE_STANDALONE_GC) && defined(FEATURE_CORECLR)
+    g_usedHandlesLock.Init(LOCK_TYPE_DEFAULT);
+#endif
 
     return S_OK;
 }

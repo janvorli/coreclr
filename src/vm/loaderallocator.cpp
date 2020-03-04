@@ -1019,6 +1019,7 @@ void LoaderAllocator::SetupManagedTracking(LOADERALLOCATORREF * pKeepLoaderAlloc
 
     m_hLoaderAllocatorObjectHandle = GetDomain()->CreateLongWeakHandle(*pKeepLoaderAllocatorAlive);
 
+    STRESS_LOG3(LF_CLASSLOADER, LL_INFO1000, "SetupManagedTracking for allocator %p adding handle %p called from %p\n", this, (void*)m_hLoaderAllocatorObjectHandle, _ReturnAddress());
     RegisterHandleForCleanup(m_hLoaderAllocatorObjectHandle);
 }
 
@@ -1832,9 +1833,18 @@ void AssemblyLoaderAllocator::RegisterHandleForCleanup(OBJECTHANDLE objHandle)
     CONTRACTL_END;
 
     void * pItem = GetLowFrequencyHeap()->AllocMem(S_SIZE_T(sizeof(HandleCleanupListItem)));
+    STRESS_LOG3(LF_CLASSLOADER, LL_INFO1000, "RegisterHandleForCleanup for allocator %p adding handle %p called from %p\n", this, (void*)objHandle, _ReturnAddress());
 
     // InsertTail must be protected by a lock. Just use the loader allocator lock
     CrstHolder ch(&m_crstLoaderAllocator);
+    for (HandleCleanupListItem* item = m_handleCleanupList.GetHead(); item != NULL; item = SList<HandleCleanupListItem>::GetNext(item))
+    {
+        if (item->m_handle == objHandle)
+        {
+            STRESS_LOG3(LF_CLASSLOADER, LL_INFO1000, "Double RegisterHandleForCleanup for allocator %p adding handle %p called from %p\n", this, (void*)objHandle, _ReturnAddress());
+            EEPOLICY_HANDLE_FATAL_ERROR_WITH_MESSAGE(COR_E_FAILFAST, W("Double register of a handle"));
+        }
+    }
     m_handleCleanupList.InsertTail(new (pItem) HandleCleanupListItem(objHandle));
 }
 
@@ -1856,6 +1866,7 @@ void AssemblyLoaderAllocator::CleanupHandles()
     while (!m_handleCleanupList.IsEmpty())
     {
         HandleCleanupListItem * pItem = m_handleCleanupList.RemoveHead();
+        STRESS_LOG2(LF_CLASSLOADER, LL_INFO1000, "CleanupHandles for allocator %p destroying handle %p\n", this, (void*)pItem->m_handle);
         DestroyTypedHandle(pItem->m_handle);
     }
 }
