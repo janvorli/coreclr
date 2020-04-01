@@ -148,7 +148,7 @@ private:
 
 private:
     SharedMemoryProcessDataHeader *m_processDataHeader;
-    NamedMutexSharedData *m_sharedData;
+    //NamedMutexSharedData *m_sharedData;
     SIZE_T m_lockCount;
 #if !NAMED_MUTEX_USE_PTHREAD_MUTEX
     HANDLE m_processLockHandle;

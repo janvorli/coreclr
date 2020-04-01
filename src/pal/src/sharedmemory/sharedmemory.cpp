@@ -28,6 +28,9 @@ SET_DEFAULT_DEBUG_CHANNEL(SHMEM);
 
 #include "pal/sharedmemory.inl"
 
+LONG SharedDataAllocationsRingBuffer::m_pos = -1;
+SharedDataAllocationsRingBuffer::Entry SharedDataAllocationsRingBuffer::s_entries[1024*1024];
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AutoFreeBuffer
 
@@ -338,6 +341,8 @@ void *SharedMemoryHelpers::MemoryMapFile(int fileDescriptor, SIZE_T byteCount)
     _ASSERTE(AlignDown(byteCount, GetVirtualPageSize()) == byteCount);
 
     void *sharedMemoryBuffer = mmap(nullptr, byteCount, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescriptor, 0);
+    SharedDataAllocationsRingBuffer::Add(SharedDataAllocationsRingBuffer::Map, sharedMemoryBuffer);
+
     if (sharedMemoryBuffer != MAP_FAILED)
     {
         return sharedMemoryBuffer;
@@ -939,6 +944,7 @@ void SharedMemoryProcessDataHeader::Close()
             m_sharedDataHeader->~SharedMemorySharedDataHeader();
         }
 
+        SharedDataAllocationsRingBuffer::Add(SharedDataAllocationsRingBuffer::Unmap, m_sharedDataHeader);
         munmap(m_sharedDataHeader, m_sharedDataTotalByteCount);
         SharedMemoryHelpers::CloseFile(m_fileDescriptor);
     }

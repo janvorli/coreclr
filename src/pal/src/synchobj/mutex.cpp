@@ -857,6 +857,7 @@ void MutexHelpers::InitializeProcessSharedRobustRecursiveMutex(pthread_mutex_t *
     _ASSERTE(error == 0);
 
     error = pthread_mutex_init(mutex, &mutexAttributes);
+    SharedDataAllocationsRingBuffer::Add(SharedDataAllocationsRingBuffer::InitMutex, mutex);
     if (error != 0)
     {
         throw SharedMemoryException(static_cast<DWORD>(error == EPERM ? SharedMemoryError::IO : SharedMemoryError::OutOfMemory));
@@ -867,6 +868,7 @@ void MutexHelpers::DestroyMutex(pthread_mutex_t *mutex)
 {
     _ASSERTE(mutex != nullptr);
 
+    SharedDataAllocationsRingBuffer::Add(SharedDataAllocationsRingBuffer::DestroyMutex, mutex);
     int error = pthread_mutex_destroy(mutex);
     _ASSERTE(error == 0 || error == EBUSY); // the error will be EBUSY if the mutex is locked
 }

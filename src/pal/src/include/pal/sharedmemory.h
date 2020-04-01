@@ -6,6 +6,7 @@
 #define _PAL_SHARED_MEMORY_H_
 
 #include "corunix.hpp"
+#include <pthread.h>
 
 #ifndef static_assert_no_msg
 #define static_assert_no_msg( cond ) static_assert( cond, #cond )
@@ -278,6 +279,39 @@ public:
     static void AddProcessDataHeader(SharedMemoryProcessDataHeader *processDataHeader);
     static void RemoveProcessDataHeader(SharedMemoryProcessDataHeader *processDataHeader);
     static SharedMemoryProcessDataHeader *FindProcessDataHeader(SharedMemoryId *id);
+};
+
+class SharedDataAllocationsRingBuffer
+{
+public:
+    enum EntryType
+    {
+        Map,
+        Unmap,
+        DestroyMutex,
+        InitMutex
+    };
+
+private:
+    struct Entry
+    {
+        EntryType type;
+        void* memory;
+        pthread_t pthread;
+    };
+
+    static Entry s_entries[1024*1024];
+    static LONG m_pos;
+
+public:
+
+    static void Add(EntryType type, void* memory)
+    {
+        LONG pos = InterlockedIncrement(&m_pos);
+        s_entries[pos].type = type;
+        s_entries[pos].memory = memory;
+        s_entries[pos].pthread = pthread_self();
+    }
 };
 
 #endif // !_PAL_SHARED_MEMORY_H_
