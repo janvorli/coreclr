@@ -1863,6 +1863,10 @@ public:
     }
 #endif // WIN64EXCEPTIONS
 
+#ifdef _TARGET_UNIX_
+    ULONG GetPrologSize();
+#endif // _TARGET_UNIX_
+
 #if defined(_TARGET_AMD64_)
     void         GetOffsetsFromUnwindInfo(ULONG* pRSPOffset, ULONG* pRBPOffset);
 

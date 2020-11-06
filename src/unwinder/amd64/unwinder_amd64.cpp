@@ -350,6 +350,24 @@ PEXCEPTION_ROUTINE RtlVirtualUnwind_Unsafe(
     return handlerRoutine;
 }
 
+ULONG OOPStackUnwinderAMD64::GetPrologSize(__in ULONG64 ImageBase,
+    __in PT_RUNTIME_FUNCTION FunctionEntry)
+{
+    PUNWIND_INFO UnwindInfo = GetUnwindInfo(ImageBase + FunctionEntry->UnwindInfoAddress);
+    if (UnwindInfo == NULL)
+    {
+        return 0;
+    }
+
+    return UnwindInfo->SizeOfProlog;
+}
+
+ULONG GetPrologSize(__in ULONG64 ImageBase,
+    __in PT_RUNTIME_FUNCTION FunctionEntry
+)
+{
+    return OOPStackUnwinderAMD64::GetPrologSize(ImageBase, FunctionEntry);
+}
 
 #endif // DACCESS_COMPILE
 

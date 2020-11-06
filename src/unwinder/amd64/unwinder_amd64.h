@@ -35,6 +35,11 @@ public:
         __inout_opt PKNONVOLATILE_CONTEXT_POINTERS ContextPointers,
         __deref_opt_out_opt PEXCEPTION_ROUTINE *HandlerRoutine);
 
+    static ULONG GetPrologSize(__in ULONG64 ImageBase,
+        __in PT_RUNTIME_FUNCTION FunctionEntry);
+
+    static ULONG GetPrologSize(EECodeInfo* codeInfo);
+
 protected:
 
     static ULONG UnwindOpSlots(__in UNWIND_CODE UnwindCode);

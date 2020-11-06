@@ -14346,8 +14346,22 @@ BOOL EECodeInfo::HasFrameRegister()
 }
 #endif // defined(_TARGET_AMD64_)
 
-#endif // defined(WIN64EXCEPTIONS)
+#ifdef _TARGET_UNIX_
+ULONG GetPrologSize(__in ULONG64 ImageBase,
+    __in PT_RUNTIME_FUNCTION FunctionEntry
+);
 
+ULONG EECodeInfo::GetPrologSize()
+{
+    LIMITED_METHOD_CONTRACT;
+    SUPPORTS_DAC;
+
+    // TODO: x86 doesn't use function entry, so we need to extract it from the GC info
+    return ::GetPrologSize(GetModuleBase(), GetFunctionEntry())
+}
+#endif // _TARGET_UNIX_
+
+#endif // defined(WIN64EXCEPTIONS)
 
 #if defined(_TARGET_AMD64_)
 // ----------------------------------------------------------------------------

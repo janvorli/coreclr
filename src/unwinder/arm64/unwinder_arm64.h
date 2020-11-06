@@ -21,6 +21,8 @@ public:
     // Unwind the given CONTEXT to the caller CONTEXT.  The CONTEXT will be overwritten.  
     BOOL Unwind(T_CONTEXT * pContext);
 
+    ULONG GetPrologSize(__in ULONG64 ImageBase,
+                        __in PT_RUNTIME_FUNCTION FunctionEntry);
     //
     // Everything below comes from dbghelp.dll.
     //

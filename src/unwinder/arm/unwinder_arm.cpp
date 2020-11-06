@@ -1497,6 +1497,73 @@ BOOL DacUnwindStackFrame(T_CONTEXT *pContext, T_KNONVOLATILE_CONTEXT_POINTERS* p
 }
 
 #if defined(FEATURE_PAL)
+
+ULONG OOPStackUnwinderArm::GetPrologSize(__in ULONG64 ImageBase,
+    __in PT_RUNTIME_FUNCTION FunctionEntry)
+{
+    PUNWIND_INFO UnwindInfo = GetUnwindInfo(ImageBase + FunctionEntry->UnwindInfoAddress);
+    if (UnwindInfo == NULL)
+    {
+        return 0;
+    }
+
+    //
+    // Fetch the header word from the .xdata blob
+    //
+
+    ULONG UnwindDataPtr = ImageBase + FunctionEntry->UnwindData;
+    ULONG HeaderWord = MEMORY_READ_DWORD(UnwindParams, UnwindDataPtr);
+    UnwindDataPtr += 4;
+
+    //
+    // Verify the version before we do anything else
+    //
+
+    if (((HeaderWord >> 18) & 3) != 0) {
+        //return E_UNEXPECTED;
+        return 0;
+    }
+
+    //
+    // Determine the number of epilog scope records and the maximum number
+    // of unwind codes.
+    //
+
+    ULONG UnwindWords = (HeaderWord >> 28) & 15;
+    ULONG EpilogScopeCount = (HeaderWord >> 23) & 31;
+    if (EpilogScopeCount == 0 && UnwindWords == 0) {
+        EpilogScopeCount = MEMORY_READ_DWORD(UnwindParams, UnwindDataPtr);
+        UnwindDataPtr += 4;
+        UnwindWords = (EpilogScopeCount >> 16) & 0xff;
+        EpilogScopeCount &= 0xffff;
+    }
+    if ((HeaderWord & (1 << 21)) != 0) {
+        UnwindIndex = EpilogScopeCount;
+        EpilogScopeCount = 0;
+    }
+
+    UnwindCodePtr = UnwindDataPtr + 4 * EpilogScopeCount;
+    UnwindCodesEndPtr = UnwindCodePtr + 4 * UnwindWords;
+
+    //
+    // If this function has a prolog,
+    // compute the size of the prolog from the unwind codes. 
+    //
+
+    if (((HeaderWord & (1 << 22)) == 0)) {
+        return RtlpComputeScopeSize(UnwindCodePtr, UnwindCodesEndPtr, FALSE, UnwindParams);
+    }
+
+    return 0;
+}
+
+ULONG GetPrologSize(__in ULONG64 ImageBase,
+    __in PT_RUNTIME_FUNCTION FunctionEntry
+)
+{
+    return OOPStackUnwinderArm::GetPrologSize(ImageBase, FunctionEntry);
+}
+
 PEXCEPTION_ROUTINE RtlVirtualUnwind(
     __in ULONG HandlerType,
     __in ULONG ImageBase,
