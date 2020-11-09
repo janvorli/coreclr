@@ -6725,6 +6725,12 @@ void HandleGCSuspensionForInterruptedThread(CONTEXT *interruptedContext)
         REGDISPLAY regDisplay;
         pThread->InitRegDisplay(&regDisplay, interruptedContext, true /* validContext */);
 
+#if defined(FEATURE_PAL) && (defined(_TARGET_AMD64_) || defined(_TARGET_X86_))
+        // Stack probing loops on Unix for amd64 / x86 move SP in the prolog and that prevents unwinding to the caller frame from working properly.
+        if (IsIPInProlog(&codeInfo))
+            return;
+#endif // FEATURE_PAL && (_TARGET_AMD64_ || _TARGET_X86_)
+
         BOOL unused;
 
         if (IsIPInEpilog(interruptedContext, &codeInfo, &unused))
